@@ -1,9 +1,12 @@
 ;;; Directed graph is a list of payloads (called nodes) together with 
 ;;; a list of incoming and outgoing edges.
 (defclass digraph ()
-  ((nodes :initarg :nodes :reader dg-nodes)
-   (outgoing :initarg :outgoing :reader dg-outgoing)
-   (incoming :initarg :incoming :reader dg-incoming)
+  ((nodes :initarg :nodes 
+		  :accessor dg-nodes)
+   (outgoing :initarg :outgoing 
+			 :accessor dg-out)
+   (incoming :initarg :incoming 
+			 :accessor dg-inc)
    ))
 
 ;;; Create and return an empty directed graph.
@@ -12,7 +15,7 @@
 				 :nodes nil
 				 :outgoing (make-hash-table
 							 :test #'equal)
-				 :outgoing (make-hash-table
+				 :incoming (make-hash-table
 							 :test #'equal)
 				 
 				))
@@ -24,13 +27,13 @@
 ;;; Insert edge into graph
 (defun insert-edge (digraph org dst)
   (progn
-	(setf (gethash org (dg-outgoing digraph)) 
-		  (cons dst (gethash org (dg-outgoing digraph))))
-	(setf (gethash dst (dg-incoming digraph))
-		  (cons org (gethash dst (dg-incoming digraph))))))
+	(setf (gethash org (dg-out digraph)) 
+		  (cons dst (gethash org (dg-out digraph))))
+	(setf (gethash dst (dg-inc digraph))
+		  (cons org (gethash dst (dg-inc digraph))))))
 
 ;;; Print function
 (defun print-digraph (digraph)
   (loop for x in (dg-nodes digraph)
 		do (format t "~A: ~A ~%" x 
-				   (gethash x (dg-outgoing digraph)))))
+				   (gethash x (dg-out digraph)))))
