@@ -17,36 +17,38 @@
 (defclass timegraph ()
   ((dag :initarg :dag
 		:accessor tg-dag)
-   (meta :initarg: meta
+   (meta :initarg :meta
 		 :accessor tg-meta)
    (data :initarg :data
 		 :accessor tg-data)
-   (K :initarg :K :accessor tg-K)))
+   (K :initarg :K 
+	  :accessor tg-K)
+   ))
 
 (defun make-timegraph()
   (make-instance 'timegraph
 				 :dag (make-digraph)
 				 :meta (make-digraph)
-				 :data (list
-						 (make-hash-table
-						 :test #'equal))))
-				:K 0
+				 :data (make-hash-table :test #'equal)
+				 :K 0))
 
 ;;; Check if a timepoint t1 is the last in its chain
+;;; note: can be constant time by keeping track of max pseudotime.
 (defun last-p (tgraph t1)
   (every 
 	(lambda (tj) 
 	  (not (equal (gethash t1 (tg-data tgraph))
 				  (gethash tj (tg-data tgraph)))))
-	(get-outgoing (tg-dag timegraph) t1)))
+	(get-outgoing (tg-dag tgraph) t1)))
 
 ;;; Check if a timepoint t1 is the first in its chain
+;;; note: can be constant time by keeping track of min pseudotime.
 (defun first-p (tgraph t1)
   (every 
 	(lambda (tj) 
 	  (not (equal (gethash t1 (tg-data tgraph))
 				  (gethash tj (tg-data tgraph)))))
-	(get-incoming (tg-dag timegraph) t1)))
+	(get-incoming (tg-dag tgraph) t1)))
 
 ;;; Introduce a new timepoint into the timegraph with no relations. This 
 ;;;puts the new timepoint in its own chain. 
@@ -59,5 +61,5 @@
 
 ;;; Insert a new timepoint, t1, into the graph that is after some existing 
 ;;; point t2.
-(defun insert-timepoint-after (tgraph t1 t2)
-  )
+;(defun insert-timepoint-after (tgraph t1 t2)
+;  )
