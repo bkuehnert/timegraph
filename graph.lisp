@@ -1,5 +1,5 @@
-;;; Directed graph is a list of payloads (called nodes) together with 
-;;; a list of incoming and outgoing edges.
+;;; Directed graph is a list of nodes together with a list of incoming and 
+;;; outgoing edges.
 (defclass digraph ()
   ((nodes :initarg :nodes 
 		  :accessor dg-nodes)
@@ -32,7 +32,15 @@
 	(setf (gethash dst (dg-inc digraph))
 		  (cons org (gethash dst (dg-inc digraph))))))
 
-;;; Print function
+;;; Return list of nodes pointed to by 'node'
+(defun get-outgoing (digraph node)
+  (gethash node (dg-out digraph)))
+
+;;; Return list of nodes that point to 'node'
+(defun get-incoming (digraph node)
+  (gethash node (dg-inc digraph)))
+
+;;; Print digraph's nodes and adjacency lists
 (defun print-digraph (digraph)
   (loop for x in (dg-nodes digraph)
 		do (format t "~A: ~A ~%" x 
