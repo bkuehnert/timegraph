@@ -55,11 +55,42 @@
 (defun insert-timepoint (tgraph t1)
   (progn
 	(insert-node (tg-dag tgraph) t1)
-	(insert-node (tg-meta tgraph) t1)
 	(setf (tg-K tgraph) (+ (tg-K tgraph) 1))
+	(insert-node (tg-meta tgraph) (tg-K tgraph))
 	(setf (gethash t1 (tg-data tgraph)) (list (tg-K tgraph) 1))))
 
 ;;; Insert a new timepoint, t1, into the graph that is after some existing 
 ;;; point t2.
-;(defun insert-timepoint-after (tgraph t1 t2)
-;  )
+(defun insert-timepoint-after (tgraph t1 t2)
+  (progn
+	(insert-node (tg-dag tgraph) t1)
+	(insert-edge (tg-dag tgraph) t2 t1)
+  	((if (last-p t2)
+	  (setf (gethash t1 (tg-data tgraph) (chain-data tgraph t2 1)))
+	  (progn
+		(insert-timepoint tgraph t1)
+		(insert-edge (tg-meta tgraph) 
+					 (nth 1 (gethash t1 (tg-data tgraph)))
+					 (tg-K tgraph)))
+  ))))
+
+;;; Insert a new timepoint, t1, into the  graph that is before some existing
+;;; point t2
+(defun insert-timepoint-before (tgraph t1 t2)
+  (progn
+	(insert-node (tg-dag tgraph) t1)
+	(insert-edge (tg-dag tgraph) t1 t2)
+  	((if (first-p t2)
+	  (setf (gethash t1 (tg-data tgraph) (chain-data tgraph t2 -1)))
+	  (progn
+		(insert-timepoint tgraph t1)
+		(insert-edge (tg-meta tgraph) 
+					 (tg-K tgraph)
+					 (nth 1 (gethash t1 (tg-data tgraph)))))
+  ))))
+
+;;; Helper function: For a timepoint t1, returns (s,t+inc) where s is the
+;;; chain of t1, t is the pseudotime, and inc is a parameter
+(defun chain-data (tgraph t1 inc)
+  (list (nth 1 (gethash t1 (tg-data tgraph)))
+		(+ inc (nth 2 (gethash t1 (tg-data tgraph))))))
