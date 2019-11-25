@@ -22,15 +22,17 @@
 
 ;;; Insert node into graph
 (defun insert-node (digraph node)
-  (setf (dg-nodes digraph) (cons node (dg-nodes digraph))))
+  (if (not (member node (dg-nodes digraph)))
+  	(setf (dg-nodes digraph) (cons node (dg-nodes digraph)))))
 
 ;;; Insert edge into graph
 (defun insert-edge (digraph org dst)
-  (progn
-	(setf (gethash org (dg-out digraph)) 
-		  (cons dst (gethash org (dg-out digraph))))
-	(setf (gethash dst (dg-inc digraph))
-		  (cons org (gethash dst (dg-inc digraph))))))
+  (if (not (member dst (gethash org (dg-out digraph))))
+	(progn
+		(setf (gethash org (dg-out digraph)) 
+			  (cons dst (gethash org (dg-out digraph))))
+		(setf (gethash dst (dg-inc digraph))
+			  (cons org (gethash dst (dg-inc digraph)))))))
 
 ;;; Return list of nodes pointed to by 'node'
 (defun get-outgoing (digraph node)
