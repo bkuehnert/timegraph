@@ -59,7 +59,7 @@
 
 ;;; Helper function: For a timepoint t1, returns (s,t+inc) where s is the
 ;;; chain of t1, t is the pseudotime, and inc is a parameter
-(defun chain-data (tgraph t1 inc)
+(defun get-chain-data (tgraph t1 inc)
   (list (nth 0 (gethash t1 (tg-data tgraph)))
 		(+ inc (nth 1 (gethash t1 (tg-data tgraph))))))
 
@@ -88,7 +88,7 @@
 (defun insert-timepoint-after (tgraph t1 t2)
   (progn
   	(if (last-p tgraph t2)
-	  (setf (gethash t1 (tg-data tgraph)) (chain-data tgraph t2 1))
+	  (setf (gethash t1 (tg-data tgraph)) (get-chain-data tgraph t2 1))
 	  (progn
 		(insert-timepoint tgraph t1)
 		(insert-edge (tg-meta tgraph) 
@@ -103,7 +103,7 @@
 (defun insert-timepoint-before (tgraph t1 t2)
   (progn
   	(if (first-p tgraph t2)
-	  (setf (gethash t1 (tg-data tgraph)) (chain-data tgraph t2 -1))
+	  (setf (gethash t1 (tg-data tgraph)) (get-chain-data tgraph t2 -1))
 	  (progn
 		(insert-timepoint tgraph t1)
 		(insert-edge (tg-meta tgraph) 
