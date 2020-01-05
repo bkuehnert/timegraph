@@ -9,7 +9,11 @@
 ;;; * meta: the metagraph which is 'dag' modulo timechains, which is a list 
 ;;; of time points in successive order. 
 ;;;
-;;; * chains: is hashmap which maps each each timepoint to its chain
+;;; * hash: a hashtable which maps each timepoint to an identifier. Two
+;;; timepoints will have the same identifier if the timepoints have been
+;;; set to be equal.
+;;;
+;;; * chains: is hashtable which maps each each timepoint to its chain
 ;;;
 ;;; * K: is the number of chains in the metagraph. Used for assigning new 
 ;;; chains to their 'chain number'. (note: may be deprecated)
@@ -19,6 +23,8 @@
 		:accessor tg-dag)
    (meta :initarg :meta
 		 :accessor tg-meta)
+   (hash :initarg :hash
+		 :accessor tg-hash)
    (chains :initarg :chains
 		   :accessor tg-chains)
    (K :initarg :K 
@@ -53,6 +59,7 @@
   (make-instance 'timegraph
 				 :dag (make-digraph)
 				 :meta (make-digraph)
+				 :hash (make-hash-table :test #'equal)
 				 :chains (make-hash-table :test #'equal)
 				 :K 0))
 
@@ -87,6 +94,7 @@
   (let ((chain (make-chain (tg-K tgraph))))
 	  (progn
 		(insert-node (tg-dag tgraph) t1)
+		(setf (gethash t1 (tg-hash tgraph)) t1)
 		(setf (tg-K tgraph) (+ (tg-K tgraph) 1))
 		(insert-node (tg-meta tgraph) chain)
 		(setf (chain-top chain) t1)
@@ -97,8 +105,9 @@
 ;;; Insert a new timepoint, t1, into the graph that is after some existing 
 ;;; point t2.
 (defun insert-timepoint-after (tgraph t1 t2)
-  (progn
-  	(if (last-p tgraph t2)
+  (let ((t2 (gethash t2 (tg-hash tgraph))))
+	(progn
+	  (if (last-p tgraph t2)
 		(let ((chain (gethash t2 (tg-chains tgraph))))
 			(progn
 			  	(setf (chain-bot chain) t1)
@@ -110,26 +119,58 @@
 			(insert-edge (tg-meta tgraph) 
 				(gethash t2 (tg-chains tgraph))
 				(gethash t1 (tg-chains tgraph)))))
-	(insert-node (tg-dag tgraph) t1)
-	(insert-edge (tg-dag tgraph) t2 t1)
-  ))
+	  (setf (gethash t1 (tg-hash tgraph)) t1)
+	  (insert-node (tg-dag tgraph) t1)
+	  (insert-edge (tg-dag tgraph) t2 t1))))
 
 ;;; Insert a new timepoint, t1, into the  graph that is before some existing
 ;;; point t2
 (defun insert-timepoint-before (tgraph t1 t2)
-  (progn
-  	(if (first-p tgraph t2)
+  (let ((t2 (gethash t2 (tg-hash tgraph))))
+	(progn
+	  (if (first-p tgraph t2)
 		(let ((chain (gethash t2 (tg-chains tgraph))))
 			(progn
 			  	(setf (chain-top chain) t1)
 	   			(setf (gethash t1 (tg-chains tgraph)) chain)
    				(setf (gethash t1 (chain-ptime chain))
-					  (- 1 (gethash t2 (chain-ptime chain))))))
+					  (- (gethash t2 (chain-ptime chain)) 1))))
 	 	 (progn
 			(insert-timepoint tgraph t1)
 			(insert-edge (tg-meta tgraph) 
 				(gethash t1 (tg-chains tgraph))
 				(gethash t2 (tg-chains tgraph)))))
-	(insert-node (tg-dag tgraph) t1)
-	(insert-edge (tg-dag tgraph) t1 t2)
-  ))
+	  (setf (gethash t1 (tg-hash tgraph)) t1)
+	  (insert-node (tg-dag tgraph) t1)
+	  (insert-edge (tg-dag tgraph) t1 t2))))
+
+;;; Insert a new timepoint, t1, into the graph that is equal to some
+;;; existing timepoint t2
+(defun insert-timepoint-equal (tgraph t1 t2)
+  (setf (gethash t1 (tg-hash tgraph)) (gethash t2 (tg-hash tgraph))))
+
+;;; Insert a new time point, t1, into the graph that is between some
+;;; existing timepoints t2 and t3. 
+;;; note: may cause inefficiency as the link t1 -> t3 remains intact. It
+;;; may be better t oremove this link in some cases to reduce redundancy
+;;; in querying.
+(defun insert-timepoint-during (tgraph t1 t2 t3)
+  (let ((chain2 (gethash t2 (tg-chains tgraph)))
+		(chain3 (gethash t3 (tg-chains tgraph)))
+		(t2 (gethash t2 (tg-hash tgraph)))
+		(t3 (gethash t3 (tg-hash tgraph))))
+	(progn
+	  (cond 
+		((equal chain2 chain3)
+		 (progn
+		   (setf (gethash t1 (tg-chains tgraph)) chain2)
+		   (setf (gethash t1 (chain-ptime chain2)) 
+				 (/ (+ (gethash t2 (chain-ptime chain2))
+					   (gethash t3 (chain-ptime chain2))) 2))))
+		((last-p tgraph t2) (insert-timepoint-after tgraph t1 t2))
+		((first-p tgraph t3) (insert-timepoint-before tgraph t1 t3))
+		(t (insert-timepoint tgraph t1)))
+
+	  (insert-node (tg-dag tgraph) t1)
+	  (insert-edge (tg-dag tgraph) t2 t1)
+	  (insert-edge (tg-dag tgraph) t1 t3))))

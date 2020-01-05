@@ -34,6 +34,15 @@
 		(setf (gethash dst (dg-inc digraph))
 			  (cons org (gethash dst (dg-inc digraph)))))))
 
+;;; Delete edge from graph
+(defun remove-edge (digraph org dst)
+  (if (member dst (gethash org (dg-out digraph)))
+	(progn
+	  (setf (gethash org (dg-out digraph))
+			(remove dst (gethash org (dg-out digraph))))
+	  (setf (gethash dst (dg-inc digraph))
+			(remove org (gethash dst (dg-inc digraph)))))))
+
 ;;; Return list of nodes pointed to by 'node'
 (defun get-outgoing (digraph node)
   (gethash node (dg-out digraph)))
