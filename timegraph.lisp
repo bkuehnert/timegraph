@@ -3,11 +3,11 @@
 ;;; Time graph is composed of two directed acyclic graphs (DAGs), and a map
 ;;; which relates the two
 ;;; -----------------------------------------------------------------------
-;;; * dag:, consists of time points with an edge (u,v) meaning that u 
-;;; occurs before v. 
+;;; * dag:, consists of (uniquely determined) time points with an edge 
+;;; (u,v) meaning that u occurs before v. 
 ;;;
-;;; * meta: the metagraph which is 'dag' modulo timechains, which is a list 
-;;; of time points in successive order. 
+;;; * meta: consists of (uniquely determined) time points with an edge
+;;; (u,v) meaning that there is cross-chain link u -> v.
 ;;;
 ;;; * hash: a hashtable which maps each timepoint to an identifier. Two
 ;;; timepoints will have the same identifier if the timepoints have been
@@ -71,6 +71,10 @@
 				 :bot nil
 				 :ptime (make-hash-table :test #'equal)))
 
+;;; Function to get list of keys in hashtable.
+(defun hash-keys (hash-table)
+  (loop for key being the hash-keys of hash-table collect key))
+
 ;;; Check if a timepoint t1 is the last in its chain
 (defun last-p (tgraph t1)
   (equal t1 (chain-bot (gethash t1 (tg-chains tgraph)))))
@@ -114,11 +118,9 @@
 	   			(setf (gethash t1 (tg-chains tgraph)) chain)
    				(setf (gethash t1 (chain-ptime chain))
 					  (+ 1 (gethash t2 (chain-ptime chain))))))
-	 	 (progn
-			(insert-timepoint tgraph t1)
-			(insert-edge (tg-meta tgraph) 
-				(gethash t2 (tg-chains tgraph))
-				(gethash t1 (tg-chains tgraph)))))
+		(progn
+		  (insert-timepoint tgraph t1)
+		  (insert-edge (tg-meta tgraph) t2 t1)))
 	  (setf (gethash t1 (tg-hash tgraph)) t1)
 	  (insert-node (tg-dag tgraph) t1)
 	  (insert-edge (tg-dag tgraph) t2 t1))))
@@ -135,11 +137,9 @@
 	   			(setf (gethash t1 (tg-chains tgraph)) chain)
    				(setf (gethash t1 (chain-ptime chain))
 					  (- (gethash t2 (chain-ptime chain)) 1))))
-	 	 (progn
-			(insert-timepoint tgraph t1)
-			(insert-edge (tg-meta tgraph) 
-				(gethash t1 (tg-chains tgraph))
-				(gethash t2 (tg-chains tgraph)))))
+		(progn
+		  (insert-timepoint tgraph t1)
+		  (insert-edge (tg-meta tgraph) t1 t2)))
 	  (setf (gethash t1 (tg-hash tgraph)) t1)
 	  (insert-node (tg-dag tgraph) t1)
 	  (insert-edge (tg-dag tgraph) t1 t2))))
@@ -155,8 +155,10 @@
 ;;; may be better t oremove this link in some cases to reduce redundancy
 ;;; in querying.
 (defun insert-timepoint-during (tgraph t1 t2 t3)
-  (let ((chain2 (gethash t2 (tg-chains tgraph)))
-		(chain3 (gethash t3 (tg-chains tgraph)))
+  (let ((chain2 (gethash (gethash t2 (tg-hash tgraph)) 
+						 (tg-chains tgraph)))
+		(chain3 (gethash (gethash t3 (tg-hash tgraph))
+						 (tg-chains tgraph)))
 		(t2 (gethash t2 (tg-hash tgraph)))
 		(t3 (gethash t3 (tg-hash tgraph))))
 	(progn
@@ -167,10 +169,81 @@
 		   (setf (gethash t1 (chain-ptime chain2)) 
 				 (/ (+ (gethash t2 (chain-ptime chain2))
 					   (gethash t3 (chain-ptime chain2))) 2))))
-		((last-p tgraph t2) (insert-timepoint-after tgraph t1 t2))
-		((first-p tgraph t3) (insert-timepoint-before tgraph t1 t3))
-		(t (insert-timepoint tgraph t1)))
+		((last-p tgraph t2) 
+		 (progn
+		   (insert-timepoint-after tgraph t1 t2)
+		   (insert-edge (tg-meta tgraph) t1 t3)))
+		((first-p tgraph t3) 
+		 (progn
+		   (insert-timepoint-before tgraph t1 t3)
+		   (insert-edge (tg-meta tgraph) t2 t1)))
+		(t 
+		  (progn
+			(insert-timepoint tgraph t1)
+			(insert-edge (tg-meta tgraph) t2 t1)
+			(insert-edge (tg-meta tgraph) t1 t3))))
 
 	  (insert-node (tg-dag tgraph) t1)
 	  (insert-edge (tg-dag tgraph) t2 t1)
 	  (insert-edge (tg-dag tgraph) t1 t3))))
+
+
+;;; runs through src's chain and runs helper2
+(defun get-relation-helper1 (tgraph src dst seen)
+  (let ((chain-src (gethash src (tg-chains tgraph)))
+		(chain-dst (gethash dst (tg-chains tgraph))))
+	(cond 
+	  ((and (equal chain-src chain-dst)
+				   (<= (gethash src (chain-ptime chain-src))
+					   (gethash dst (chain-ptime chain-dst)))) t)
+	  ((and (equal chain-src chain-dst)
+				   (> (gethash src (chain-ptime chain-src))
+					   (gethash dst (chain-ptime chain-dst)))) nil)
+	  ((not (gethash src seen)) 
+	   (progn
+		 (setf (gethash src seen) t)
+		 (if (not (hash-keys (chain-ptime chain-src)))
+		   nil
+		   (dolist (node (hash-keys (chain-ptime chain-src)))
+			 (if (get-relation-helper2 tgraph node src dst seen)
+			   (return t)))))))))
+
+;;; runs through src's cross-chain links and runs helper1
+(defun get-relation-helper2 (tgraph src par dst seen)
+  (let ((chain (gethash src (tg-chains tgraph))))
+	(if (<= (gethash par (chain-ptime chain)) 
+				(gethash src (chain-ptime chain)))
+	  (progn
+		(setf (gethash src seen) t)
+		(if (not (get-outgoing (tg-meta tgraph) src))
+		  nil
+		  (dolist (node (get-outgoing (tg-meta tgraph) src))
+			(if (get-relation-helper1 tgraph node dst seen)
+			  (return t))))))))
+
+;;; For two timepoints t1 and t2, compute the relation (if one exists)
+;;; between the two timepoints. Possible return values are:
+;;; 	- nil : no relation found
+;;; 	- 1   : t1 before t2
+;;;     - 2   : t1 after t2 (t2 before t1)
+;;;     - 3   : t1 equal to t2
+;;; note: can be made slightly faster by keeping chains sorted
+(defun get-relation (tgraph t1 t2)
+  (let ((chain1 (gethash (gethash t1 (tg-hash tgraph)) 
+						 (tg-chains tgraph)))
+		(chain2 (gethash (gethash t2 (tg-hash tgraph))
+						 (tg-chains tgraph)))
+ 		(t1 (gethash t1 (tg-hash tgraph)))
+		(t2 (gethash t2 (tg-hash tgraph))))
+	(cond
+	  ((or (not t1) (not t2)) nil)
+	  ((and (equal chain1 chain2) (< (gethash t1 (chain-ptime chain1))
+									 (gethash t2 (chain-ptime chain2)))) 1)
+	  ((and (equal chain1 chain2) (> (gethash t1 (chain-ptime chain1))
+									 (gethash t2 (chain-ptime chain2)))) 2)
+	  ((equal t1 t2) 3)
+	  ((get-relation-helper1 
+		 tgraph t1 t2 (make-hash-table :test #'equal)) 1)
+	  ((get-relation-helper1
+		 tgraph t2 t1 (make-hash-table :test #'equal)) 2)
+	  (t nil))))
