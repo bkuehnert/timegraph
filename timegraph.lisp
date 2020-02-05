@@ -81,44 +81,41 @@
 ;;; puts the new timepoint in its own chain. 
 (defun insert-timepoint (tgraph t1)
   (let ((tp (make-timepoint nil nil 1 nil)))
-	  (progn
-		(setf (gethash t1 (tg-hash tgraph)) tp)
-		(setf (gethash tp (tg-chains tgraph)) (sxhash tp)))))
+	(setf (gethash t1 (tg-hash tgraph)) tp)
+	(setf (gethash tp (tg-chains tgraph)) (sxhash tp))))
 
 ;;; Insert a new timepoint, t1, into the graph that is after some existing 
 ;;; point t2. Note: 't2' is not the name of a timepoint, but instead is 
 ;;; the actual timepoint object itself.
 (defun insert-timepoint-after (tgraph t1 t2)
-  (progn
-	(if (last-p t2)
-	  (progn 
-	    (setf (gethash t1 (tg-hash tgraph)) 
+  (cond 
+	((last-p t2)
+	 (setf (gethash t1 (tg-hash tgraph)) 
 			  (make-timepoint t2 nil (+ (tp-ptime t2) 1) nil))
-	    (setf (gethash (gethash t1 (tg-hash tgraph))
-					   (tg-chains tgraph)) 
-			  (gethash t2 (tg-chains tgraph)))
-		(setf (tp-next t2) (gethash t1 (tg-hash tgraph))))
-	  (progn
-		(insert-timepoint tgraph t1)
-		(setf (tp-links t2) (cons (gethash t1 (tg-hash tgraph))
-								  (tp-links t2)))))))
+	 (setf (gethash (gethash t1 (tg-hash tgraph))
+					(tg-chains tgraph)) 
+		   (gethash t2 (tg-chains tgraph)))
+	 (setf (tp-next t2) (gethash t1 (tg-hash tgraph))))
+	(t
+	  (insert-timepoint tgraph t1)
+	  (setf (tp-links t2) (cons (gethash t1 (tg-hash tgraph))
+								(tp-links t2))))))
 
 ;;; Insert a new timepoint, t1, into the  graph that is before some 
 ;;; existing point t2. Note: 't2' is not the name of a timepoint, but
 ;;; instead is the actual timepoint object itself.
 (defun insert-timepoint-before (tgraph t1 t2)
-  (progn
-	(if (first-p t2)
-	  (progn
-	    (setf (gethash t1 (tg-hash tgraph)) 
-			  (make-timepoint nil t2 (- (tp-ptime t2) 1) nil))
-	    (setf (gethash (gethash t1 (tg-hash tgraph)) (tg-chains tgraph)) 
-			  (gethash t2 (tg-chains tgraph)))
-		(setf (tp-prev t2) (gethash t1 (tg-hash tgraph))))
-	  (progn
-	    (insert-timepoint tgraph t1)
-	    (setf (tp-links (gethash t1 (tg-hash tgraph))) 
-			  (cons t2 nil))))))
+  (cond 
+	((first-p t2)
+	 (setf (gethash t1 (tg-hash tgraph)) 
+		   (make-timepoint nil t2 (- (tp-ptime t2) 1) nil))
+	 (setf (gethash (gethash t1 (tg-hash tgraph)) (tg-chains tgraph)) 
+		   (gethash t2 (tg-chains tgraph)))
+	 (setf (tp-prev t2) (gethash t1 (tg-hash tgraph))))
+	(t
+	 (insert-timepoint tgraph t1)
+	 (setf (tp-links (gethash t1 (tg-hash tgraph))) 
+		   (cons t2 nil)))))
 
 ;;; Insert a new timepoint, t1, into the graph that is equal to some
 ;;; existing timepoint t2. Note: 't2' **IS** the name of the timepoint
@@ -138,36 +135,31 @@
 						 (tg-chains tgraph)))
 		(t2 (gethash t2 (tg-hash tgraph)))
 		(t3 (gethash t3 (tg-hash tgraph))))
-	(progn
-	  (cond 
-		((and (equal chain2 chain3) (equal (tp-next t2) t3))
-		 (progn
-	      (setf (gethash t1 (tg-hash tgraph)) 
-				(make-timepoint 
-				  t2 
-				  t3 
-				  (/ (+ (tp-ptime t2) (tp-ptime t3)) 2) nil))
-		  (setf (gethash (gethash t1 (tg-hash tgraph)) 
-						 (tg-chains tgraph)) chain2)
-		  (setf (tp-next t2) (gethash t1 (tg-hash tgraph)))
-		  (setf (tp-prev t3) (gethash t1 (tg-hash tgraph)))))
-		((last-p t2) 
-		 (progn
-		   (insert-timepoint-after tgraph t1 t2)
-		   (setf (tp-links (gethash t1 (tg-hash tgraph)))
-				 (cons t3 (tp-links (gethash t1 (tg-hash tgraph)))))))
-		((first-p t3) 
-		 (progn
-		   (insert-timepoint-before tgraph t1 t3)
-		   (setf (tp-links t2)
-				 (cons (gethash t1 (tg-hash tgraph)) (tp-links t2)))))
-		(t 
-		  (progn
-			(insert-timepoint tgraph t1)
-		    (setf (tp-links (gethash t1 (tg-hash tgraph)))
-				  (cons t3 (tp-links (gethash t1 (tg-hash tgraph))))))
-		    (setf (tp-links t2)
-				  (cons (gethash t1 (tg-hash tgraph)) (tp-links t2))))))))
+	(cond 
+	  ((and (equal chain2 chain3) (equal (tp-next t2) t3))
+	   (setf (gethash t1 (tg-hash tgraph)) 
+			 (make-timepoint 
+			   t2 
+			   t3 
+			   (/ (+ (tp-ptime t2) (tp-ptime t3)) 2) nil))
+	   (setf (gethash (gethash t1 (tg-hash tgraph)) 
+					  (tg-chains tgraph)) chain2)
+	   (setf (tp-next t2) (gethash t1 (tg-hash tgraph)))
+	   (setf (tp-prev t3) (gethash t1 (tg-hash tgraph))))
+	  ((last-p t2) 
+	   (insert-timepoint-after tgraph t1 t2)
+	   (setf (tp-links (gethash t1 (tg-hash tgraph)))
+			 (cons t3 (tp-links (gethash t1 (tg-hash tgraph))))))
+	  ((first-p t3) 
+	   (insert-timepoint-before tgraph t1 t3)
+	   (setf (tp-links t2)
+			 (cons (gethash t1 (tg-hash tgraph)) (tp-links t2))))
+	  (t 
+		(insert-timepoint tgraph t1)
+		(setf (tp-links (gethash t1 (tg-hash tgraph)))
+			  (cons t3 (tp-links (gethash t1 (tg-hash tgraph)))))
+		(setf (tp-links t2)
+		      (cons (gethash t1 (tg-hash tgraph)) (tp-links t2)))))))
 
 ;;; runs through src's chain and runs helper2
 (defun get-relation-helper1 (tgraph src dst seen)
@@ -179,14 +171,14 @@
 	  ((and (equal chain-src chain-dst)
 				   (> (tp-ptime src) (tp-ptime dst))) nil)
 	  ((not (gethash src seen)) 
-	   (progn
-		 (setf (gethash src seen) t)
-		 (funcall (alambda (tgraph1 src1 dst1 seen1) 
-		   (if src1 
-			 (if (get-relation-helper2 tgraph1 src1 dst1 seen1) 
-			   t
-			   (self tgraph1 (tp-next src1) dst1 seen1)))) 
-				  tgraph src dst seen))))))
+	   (setf (gethash src seen) t)
+		 (funcall 
+		   (alambda (tgraph1 src1 dst1 seen1) 
+			 (if src1 
+			   (if (get-relation-helper2 tgraph1 src1 dst1 seen1) 
+				 t
+			     (self tgraph1 (tp-next src1) dst1 seen1)))) 
+		   tgraph src dst seen)))))
 
 ;;; runs through src's cross-chain links and runs helper1
 (defun get-relation-helper2 (tgraph src dst seen)
