@@ -37,8 +37,10 @@
 		 :accessor tp-next)
    (ptime :initarg :ptime
 		  :accessor tp-ptime)
-   (links :initarg :links
-		  :accessor tp-links)))
+   (in-links :initarg :in-links
+			 :accessor tp-inlinks)
+   (out-links :initarg :out-links
+			  :accessor tp-outlinks)))
 
 
 ;;; Create and return an empty timegraph.
@@ -48,12 +50,13 @@
 				 :chains (make-hash-table :test #'equal)))
 
 ;;; Create and return a new timepoint
-(defun make-timepoint (prev next ptime links)
+(defun make-timepoint (prev next ptime in-links out-links)
   (make-instance 'timepoint
 				 :prev prev
 				 :next next
 				 :ptime ptime
-				 :links links))
+				 :in-links in-links
+				 :out-links out-links))
 
 
 ;;; Function to get list of keys in hashtable.
@@ -79,8 +82,8 @@
 
 ;;; Introduce a new timepoint into the timegraph with no relations. This 
 ;;; puts the new timepoint in its own chain. 
-(defun insert-timepoint (tgraph t1)
-  (let ((tp (make-timepoint nil nil 1 nil)))
+(defun insert-timepoint (tgraph t1 in-links out-links)
+  (let ((tp (make-timepoint nil nil 1 in-links out-links)))
 	(setf (gethash t1 (tg-hash tgraph)) tp)
 	(setf (gethash tp (tg-chains tgraph)) (sxhash tp))))
 
@@ -91,15 +94,14 @@
   (cond 
 	((last-p t2)
 	 (setf (gethash t1 (tg-hash tgraph)) 
-			  (make-timepoint t2 nil (+ (tp-ptime t2) 1) nil))
-	 (setf (gethash (gethash t1 (tg-hash tgraph))
-					(tg-chains tgraph)) 
+			  (make-timepoint t2 nil (+ (tp-ptime t2) 1) nil nil))
+	 (setf (gethash (gethash t1 (tg-hash tgraph)) (tg-chains tgraph)) 
 		   (gethash t2 (tg-chains tgraph)))
 	 (setf (tp-next t2) (gethash t1 (tg-hash tgraph))))
 	(t
-	  (insert-timepoint tgraph t1)
-	  (setf (tp-links t2) (cons (gethash t1 (tg-hash tgraph))
-								(tp-links t2))))))
+	  (insert-timepoint tgraph t1 (list t2) nil)
+	  (setf (tp-outlinks t2) (cons (gethash t1 (tg-hash tgraph))
+								(tp-outlinks t2))))))
 
 ;;; Insert a new timepoint, t1, into the  graph that is before some 
 ;;; existing point t2. Note: 't2' is not the name of a timepoint, but
@@ -108,14 +110,14 @@
   (cond 
 	((first-p t2)
 	 (setf (gethash t1 (tg-hash tgraph)) 
-		   (make-timepoint nil t2 (- (tp-ptime t2) 1) nil))
+		   (make-timepoint nil t2 (- (tp-ptime t2) 1) nil nil))
 	 (setf (gethash (gethash t1 (tg-hash tgraph)) (tg-chains tgraph)) 
 		   (gethash t2 (tg-chains tgraph)))
 	 (setf (tp-prev t2) (gethash t1 (tg-hash tgraph))))
 	(t
-	 (insert-timepoint tgraph t1)
-	 (setf (tp-links (gethash t1 (tg-hash tgraph))) 
-		   (cons t2 nil)))))
+	 (insert-timepoint tgraph t1 nil (list t2))
+	 (setf (tp-inlinks t2) (cons (gethash t1 (tg-hash tgraph))
+								  (tp-inlinks t2))))))
 
 ;;; Insert a new timepoint, t1, into the graph that is equal to some
 ;;; existing timepoint t2. Note: 't2' **IS** the name of the timepoint
@@ -141,25 +143,29 @@
 			 (make-timepoint 
 			   t2 
 			   t3 
-			   (/ (+ (tp-ptime t2) (tp-ptime t3)) 2) nil))
+			   (/ (+ (tp-ptime t2) (tp-ptime t3)) 2) nil nil))
 	   (setf (gethash (gethash t1 (tg-hash tgraph)) 
 					  (tg-chains tgraph)) chain2)
 	   (setf (tp-next t2) (gethash t1 (tg-hash tgraph)))
 	   (setf (tp-prev t3) (gethash t1 (tg-hash tgraph))))
 	  ((last-p t2) 
 	   (insert-timepoint-after tgraph t1 t2)
-	   (setf (tp-links (gethash t1 (tg-hash tgraph)))
-			 (cons t3 (tp-links (gethash t1 (tg-hash tgraph))))))
+	   (setf (tp-outlinks (gethash t1 (tg-hash tgraph)))
+			 (cons t3 (tp-outlinks (gethash t1 (tg-hash tgraph)))))
+	   (setf (tp-inlinks t3) 
+			 (cons (gethash t1 (tg-hash tgraph)) (tp-inlinks t3))))
 	  ((first-p t3) 
 	   (insert-timepoint-before tgraph t1 t3)
-	   (setf (tp-links t2)
-			 (cons (gethash t1 (tg-hash tgraph)) (tp-links t2))))
+	   (setf (tp-inlinks (gethash t1 (tg-hash tgraph)))
+			 (cons t2 (tp-inlinks (gethash t1 (tg-hash tgraph)))))
+	   (setf (tp-outlinks t2)
+			 (cons (gethash t1 (tg-hash tgraph)) (tp-outlinks t2))))
 	  (t 
-		(insert-timepoint tgraph t1)
-		(setf (tp-links (gethash t1 (tg-hash tgraph)))
-			  (cons t3 (tp-links (gethash t1 (tg-hash tgraph)))))
-		(setf (tp-links t2)
-		      (cons (gethash t1 (tg-hash tgraph)) (tp-links t2)))))))
+		(insert-timepoint tgraph t1 (list t2) (list t3))
+		(setf (tp-inlinks t3)
+		      (cons (gethash t1 (tg-hash tgraph)) (tp-inlinks t3)))
+		(setf (tp-outlinks t2)
+		      (cons (gethash t1 (tg-hash tgraph)) (tp-outlinks t2)))))))
 
 ;;; runs through src's chain and runs helper2
 (defun get-relation-helper1 (tgraph src dst seen)
@@ -184,7 +190,7 @@
 (defun get-relation-helper2 (tgraph src dst seen)
   (progn
 	(setf (gethash src seen) t)
-    (dolist (node (tp-links src))
+    (dolist (node (tp-outlinks src))
 	  (if (get-relation-helper1 tgraph node dst seen) (return t)))))
 
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
@@ -219,4 +225,4 @@
 
 (defun print-tp (tp)
   (format t "prev: ~A~%next: ~A~%links: ~A"
-  (tp-prev tp) (tp-next tp) (tp-links tp)))
+  (tp-prev tp) (tp-next tp) (tp-outlinks tp)))
