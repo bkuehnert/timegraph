@@ -40,7 +40,11 @@
    (in-links :initarg :in-links
 			 :accessor tp-inlinks)
    (out-links :initarg :out-links
-			  :accessor tp-outlinks)))
+			  :accessor tp-outlinks)
+   (low-bound :initarg :low-bound
+			  :accessor :tp-lowbound)
+   (upp-bound :initarg :upp-bound
+			  :accessor tp-uppbound)))
 
 
 ;;; Create and return an empty timegraph.
@@ -70,15 +74,6 @@
 ;;; Check if a timepoint t1 is the first in its chain
 (defun first-p (t1)
   (not (tp-prev t1)))
-
-;;; Helper function: For a timepoint t1, incremement the pseudotime by 1 of
-;;; t1 and all timepoints in the chain after t1.
-;(defun renumber-chain (tgraph t1)
-;  (let ((table (chain-ptime (gethash t1 (tg-chains tgraph)))))
-;	  (maphash #'(lambda (key val)
-;				   (if (>= val (gethash t1 table))
-;					 (setf (gethash key table) (+ 1 val))))
-;			   table)))
 
 ;;; Introduce a new timepoint into the timegraph with no relations. This 
 ;;; puts the new timepoint in its own chain. 
