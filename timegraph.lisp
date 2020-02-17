@@ -124,16 +124,9 @@
 
 ;;; Insert a new time point, t1, into the graph that is between some
 ;;; existing timepoints t2 and t3. 
-;;; note: may cause inefficiency as the link t1 -> t3 remains intact. It
-;;; may be better t oremove this link in some cases to reduce redundancy
-;;; in querying.
 (defun insert-timepoint-during (tgraph t1 t2 t3)
-  (let ((chain2 (gethash (gethash t2 (tg-hash tgraph)) 
-						 (tg-chains tgraph)))
-		(chain3 (gethash (gethash t3 (tg-hash tgraph))
-						 (tg-chains tgraph)))
-		(t2 (gethash t2 (tg-hash tgraph)))
-		(t3 (gethash t3 (tg-hash tgraph))))
+  (let ((chain2 (gethash t2 (tg-chains tgraph)))
+		(chain3 (gethash t3 (tg-chains tgraph))))
 	(cond 
 	  ((and (equal chain2 chain3) (equal (tp-next t2) t3))
 	   (setf (gethash t1 (tg-hash tgraph)) 
@@ -213,6 +206,9 @@
 	  ((get-relation-helper1
 		 tgraph t2 t1 (make-hash-table :test #'equal)) 2)
 	  (t nil))))
+
+;;; Propogate timebounds
+(defun prop-bound (t1))
 
 ;;; testing functions
 ;;; ----------------------------------------------------------------------
