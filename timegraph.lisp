@@ -41,9 +41,9 @@
 			 :accessor tp-inlinks)
    (out-links :initarg :out-links
 			  :accessor tp-outlinks)
-   (upp-bound :initarg :upp-bound
+   (upbd :initarg :upbd
 			  :accessor tp-upbd)
-   (low-bound :initarg :low-bound
+   (lwbd :initarg :lwbd
 			  :accessor tp-lwbd)))
 
 
@@ -61,8 +61,8 @@
 				 :ptime ptime
 				 :in-links in
 				 :out-links out
-				 :upp-bound upbd
-				 :low-bound lwbd))
+				 :upbd upbd
+				 :lwbd lwbd))
 
 
 ;;; Function to get list of keys in hashtable.
@@ -79,8 +79,8 @@
 
 ;;; Introduce a new timepoint into the timegraph with no relations. This 
 ;;; puts the new timepoint in its own chain. 
-(defun insert-timepoint (tgraph t1 &key in out)
-  (let ((tp (make-timepoint :in in :out out)))
+(defun insert-timepoint (tgraph t1 &key in out upbd lwbd)
+  (let ((tp (make-timepoint :in in :out out :upbd upbd :lwbd lwbd)))
 	(setf (gethash t1 (tg-hash tgraph)) tp)
 	(setf (gethash tp (tg-chains tgraph)) (sxhash tp))))
 
@@ -91,12 +91,15 @@
   (cond 
 	((last-p t2)
 	 (setf (gethash t1 (tg-hash tgraph)) 
-			  (make-timepoint :prev t2 :ptime (+ (tp-ptime t2) 1)))
+		   (make-timepoint 
+			 :prev t2 
+			 :ptime (+ (tp-ptime t2) 1)
+			 :lwbd (tp-lwbd t2)))
 	 (setf (gethash (gethash t1 (tg-hash tgraph)) (tg-chains tgraph)) 
 		   (gethash t2 (tg-chains tgraph)))
 	 (setf (tp-next t2) (gethash t1 (tg-hash tgraph))))
 	(t
-	  (insert-timepoint tgraph t1 :in (list t2))
+	  (insert-timepoint tgraph t1 :in (list t2) :lwbd (tp-lwbd t2))
 	  (setf (tp-outlinks t2) (cons (gethash t1 (tg-hash tgraph))
 								(tp-outlinks t2))))))
 
@@ -107,12 +110,15 @@
   (cond 
 	((first-p t2)
 	 (setf (gethash t1 (tg-hash tgraph)) 
-		   (make-timepoint :next t2 :ptime (- (tp-ptime t2) 1)))
+		   (make-timepoint 
+			 :next t2 
+			 :ptime (- (tp-ptime t2) 1)
+			 :upbd (tp-upbd t2)))
 	 (setf (gethash (gethash t1 (tg-hash tgraph)) (tg-chains tgraph)) 
 		   (gethash t2 (tg-chains tgraph)))
 	 (setf (tp-prev t2) (gethash t1 (tg-hash tgraph))))
 	(t
-	 (insert-timepoint tgraph t1 :out (list t2))
+	 (insert-timepoint tgraph t1 :out (list t2) :upbd (tp-upbd t2))
 	 (setf (tp-inlinks t2) (cons (gethash t1 (tg-hash tgraph))
 								  (tp-inlinks t2))))))
 
@@ -133,7 +139,9 @@
 			 (make-timepoint 
 			   :prev t2 
 			   :next t3 
-			   :ptime (/ (+ (tp-ptime t2) (tp-ptime t3)) 2)))
+			   :ptime (/ (+ (tp-ptime t2) (tp-ptime t3)) 2)
+			   :lwbd (tp-lwbd t2)
+			   :upbd (tp-upbd t3)))
 	   (setf (gethash (gethash t1 (tg-hash tgraph)) 
 					  (tg-chains tgraph)) chain2)
 	   (setf (tp-next t2) (gethash t1 (tg-hash tgraph)))
@@ -143,19 +151,28 @@
 	   (setf (tp-outlinks (gethash t1 (tg-hash tgraph)))
 			 (cons t3 (tp-outlinks (gethash t1 (tg-hash tgraph)))))
 	   (setf (tp-inlinks t3) 
-			 (cons (gethash t1 (tg-hash tgraph)) (tp-inlinks t3))))
+			 (cons (gethash t1 (tg-hash tgraph)) (tp-inlinks t3)))
+	   (setf (tp-upbd (gethash t1 (tg-hash tgraph))) (tp-upbd t3))
+	   (prop-bounds (gethash t1 (tg-hash tgraph))))
 	  ((first-p t3) 
 	   (insert-timepoint-before tgraph t1 t3)
 	   (setf (tp-inlinks (gethash t1 (tg-hash tgraph)))
 			 (cons t2 (tp-inlinks (gethash t1 (tg-hash tgraph)))))
 	   (setf (tp-outlinks t2)
-			 (cons (gethash t1 (tg-hash tgraph)) (tp-outlinks t2))))
+			 (cons (gethash t1 (tg-hash tgraph)) (tp-outlinks t2)))
+	   (setf (tp-lwbd (gethash t1 (tg-hash tgraph))) (tp-lwbd t2))
+	   (prop-bounds (gethash t1 (tg-hash tgraph))))
 	  (t 
-		(insert-timepoint tgraph t1 :in (list t2) :out (list t3))
+		(insert-timepoint tgraph t1 
+						  :in (list t2) 
+						  :out (list t3)
+						  :lwbd (tp-lwbd t2)
+						  :upbd (tp-upbd t3))
 		(setf (tp-inlinks t3)
 		      (cons (gethash t1 (tg-hash tgraph)) (tp-inlinks t3)))
 		(setf (tp-outlinks t2)
-		      (cons (gethash t1 (tg-hash tgraph)) (tp-outlinks t2)))))))
+		      (cons (gethash t1 (tg-hash tgraph)) (tp-outlinks t2)))
+		(prop-bounds (gethash t1 (tg-hash tgraph)))))))
 
 ;;; runs through src's chain and runs helper2
 (defun get-relation-helper1 (tgraph src dst seen)
@@ -207,8 +224,56 @@
 		 tgraph t2 t1 (make-hash-table :test #'equal)) 2)
 	  (t nil))))
 
-;;; Propogate timebounds
-(defun prop-bound (t1))
+(defun insert-lower-bound (t1 bound)
+  (progn
+	(setf (tp-lwbd t1) bound)
+	(prop-lower-bound t1)))
+
+(defun insert-upper-bound (t1 bound)
+  (progn
+	(setf (tp-upbd t1) bound)
+	(prop-upper-bound t1)))
+
+;;; Propogate lower bound
+(defun prop-lower-bound (t1)
+  (progn
+	(prop-bound-down (tp-next t1) (tp-lwbd t1))
+	(dolist (tk (tp-outlinks t1))
+	  (prop-bound-down tk  (tp-lwbd t1)))))
+
+;;; Propogate upper bound
+(defun prop-upper-bound (t1)
+  (progn
+	(prop-bound-up (tp-prev t1) (tp-upbd t1))
+	(dolist (tk (tp-inlinks t1))
+	  (prop-bound-up tk (tp-upbd t1)))))
+
+(defun prop-bounds (t1)
+  (progn
+	(prop-upper-bound t1)
+	(prop-lower-bound t1)))
+
+;;; Propogate timebounds up
+(defun prop-bound-down (t1 bound)
+  (cond 
+	((not t1) nil)
+	((or (not (tp-lwbd t1)) (< (tp-lwbd t1) bound))
+	 (setf (tp-lwbd t1) bound)
+	 (prop-bound-down (tp-next t1) bound)
+	 (dolist (tk (tp-outlinks t1)) 
+	   (prop-bound-down tk bound))
+	 )))
+
+;;; Propogate timebounds down
+(defun prop-bound-up (t1 bound)
+  (cond 
+	((not t1) nil)
+	((or (not (tp-upbd t1)) (> (tp-upbd t1) bound))
+	 (setf (tp-upbd t1) bound)
+	 (prop-bound-down (tp-prev t1) bound)
+	 (dolist (tk (tp-inlinks t1)) 
+	   (prop-bound-up tk bound))
+	 )))
 
 ;;; testing functions
 ;;; ----------------------------------------------------------------------
