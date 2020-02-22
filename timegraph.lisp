@@ -16,7 +16,7 @@
 ;;; * links: a linked list of cross-chain links to other chains.
  
 (defclass timepoint ()
-  ((chain :initarg :prev
+  ((chain :initarg :chain
 		  :accessor tp-chain)
    (prev :initarg :prev
 		 :accessor tp-prev)
@@ -233,7 +233,7 @@
 	   (prop-bound-up tk bound)))))
 
 ;;; testing functions
-;;; ----------------------------------------------------------------------
+;;; -----------------------------------------------------------------------
 
 (defun print-tp (tp)
   (format t "prev: ~A~%next: ~A~%links: ~A"
