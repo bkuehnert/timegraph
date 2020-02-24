@@ -3,18 +3,27 @@
 ;;; If true, will not allow inconsistent relations to be added.
 (defvar *enforce-correctness* nil) 
 
-;;; Timepoints have two components: They serve as a linked list (for
-;;; internal chain relations) and they also have a list of outgoing edges
-;;; that link to other chains.
-;;; -----------------------------------------------------------------------
-;;; * prev: the previous node in the chain
+;;; * chain: Unique chain identifier. Two timepoints will have the same
+;;;   chain value iff they are on the same chain.
 ;;;
-;;; * next: the next node in the chain
+;;; * prev: Previous timepoint in the chain.
 ;;;
-;;; * ptime: pseudotime 
+;;; * next: Next timepoint in the chain.
 ;;;
-;;; * links: a linked list of cross-chain links to other chains.
- 
+;;; * ptime: Pseudotime of a timepoint
+;;;
+;;; * inc: List of timepoints that have cross chain links into the
+;;;   timepoint.
+;;;
+;;; * out: List of timepoints that have cross chain links out of the
+;;;   timepoint.
+;;;
+;;; * upper: Numerical absolute upper bound on the timepoint.
+;;;
+;;; * lower: Numerical absolute lower bound on the timepoint.
+;;;
+;;; * refs: List of episode names which point to the timepoint.
+
 (defclass timepoint ()
   ((chain :initarg :chain
 		  :accessor tp-chain)
@@ -25,31 +34,18 @@
    (ptime :initarg :ptime
 		  :accessor tp-ptime)
    (inc :initarg :inc
-			 :accessor tp-inc)
+		:accessor tp-inc)
    (out :initarg :out
-			  :accessor tp-out)
+		:accessor tp-out)
    (upper :initarg :upper
-			  :accessor tp-upper)
+		  :accessor tp-upper)
    (lower :initarg :lower
-			  :accessor tp-lower)))
+		  :accessor tp-lower)
+   (refs :initarg :refs
+		 :accessor tp-refs)))
 
-;;; IN PROGRESS PLEASE FINISH
-;;; 1. upbd -> upper, lwbd -> lower
-;;; 2. inlinks -> inc, outlinks -> out
-;;; 3. chain moved to timepoint, timegraph structure DELETED
-;;; 4. merge insert-timepoint and make-timepoint
-;;; 5. insert timepoint functions return timepoints. 
-;;; 6. equal -> no longer exists
-
-;;; Create and return an empty timegraph.
-(defun make-timegraph ()
-  (make-instance 'timegraph
-				 :hash (make-hash-table :test #'equal)
-				 :chains (make-hash-table :test #'equal)))
-
-;;; Create and return a new timepoint
 (defun make-timepoint (&key (chain (sxhash (gensym))) 
-							prev next (ptime 1) in out upper lower)
+							prev next (ptime 1) in out upper lower refs)
   (make-instance 'timepoint
 				 :chain chain
 				 :prev prev
@@ -58,7 +54,8 @@
 				 :inc in
 				 :out out
 				 :upper upper
-				 :lower lower))
+				 :lower lower
+				 :refs refs))
 
 ;;; Utility Functions
 ;;; -----------------------------------------------------------------------
