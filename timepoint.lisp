@@ -1,7 +1,7 @@
 (load "macro.lisp")
 
 ;;; If true, will not allow inconsistent relations to be added.
-(defvar *enforce-correctness* nil) 
+(defvar *enforce-correctness* t) 
 
 ;;; * chain: Unique chain identifier. Two timepoints will have the same
 ;;;   chain value iff they are on the same chain.
@@ -124,6 +124,7 @@
 (defun insert-timepoint-during (t1 t2)
   (let ((ret (gensym)))
 	(cond
+	  ((and *enforce-correctness* (before-p t1 t2)))
 	  ((and (equal (tp-chain t1) (tp-chain t2))
 			(equal (tp-next t1) t2))
 	   (setf ret (make-timepoint
@@ -158,16 +159,23 @@
 		(push ret (tp-out t1))
 		(prop-bounds ret)))))
 
-(defun get-relation-helper (src dst seen)
-  (cond
-	((and (equal (tp-chain src) (tp-chain dst)))
-	 (<= (tp-ptime src) (tp-ptime dst)))
-	((not (gethash src seen))
-	 (setf (gethash src seen) t)
-	 (dolist (node (get-successors src))
-	   (if (get-relation-helper node dst seen)
-		 t)))))
+;;; Querying functions 
+;;; ----------------------------------------------------------------------
 
+;;; Returns t if t1 is before (or equal to) t2. Returns nil if t1 is after
+;;; t2 or there is no relation found.
+(defun before-p (t1 t2)
+  ((alambda (src dst seen) 
+    (cond
+	  ((and (equal (tp-chain src) (tp-chain dst)))
+	   (<= (tp-ptime src) (tp-ptime dst)))
+	  ((not (gethash src seen))
+	   (setf (gethash src seen) t)
+	   (dolist (node (get-successors src))
+		 (if (get-relation-helper node dst seen)
+		   t))))
+	t1 t2 (make-hash-table :test #'equal))))
+  
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
 ;;; between the two timepoints. Possible return values are:
 ;;; 	- nil : no relation found
@@ -182,8 +190,8 @@
 	((and (equal (tp-chain t1) (tp-chain t2)) 
 		  (> (tp-ptime t1) (tp-ptime t2))) 2)
 	((equal t1 t2) 3)
-	((get-relation-helper t1 t2 (make-hash-table :test #'equal)) 1)
-	((get-relation-helper t2 t1 (make-hash-table :test #'equal)) 2)
+	((before-p t1 t2) 1)
+	((before-p t2 t1) 2)
 	(t nil)))
 
 (defun insert-lower-bound (t1 bound)
