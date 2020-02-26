@@ -103,7 +103,7 @@
 
 ;;; Given a timepoint t1, creates and returns a new timepoint which is
 ;;; directly after t1 in the graph.
-(defun insert-timepoint-after (t1)
+(defun insert-timepoint-after (t1 &key refs)
   (let ((ret (gensym)))
 	(cond 
 	  ((not t1) nil) ;;; add error message here
@@ -112,17 +112,21 @@
 				   :chain (tp-chain t1)
 				   :prev t1
 				   :ptime (1+ (tp-ptime t1))
-				   :lower (tp-lower t1)))
+				   :lower (tp-lower t1)
+				   :refs refs))
 	   (setf (tp-next t1) ret)
 	   ret)
 	  (t
-		(setf ret (make-timepoint :in (list t1) :lower (tp-lower t1)))
+		(setf ret (make-timepoint 
+					:in (list t1) 
+					:lower (tp-lower t1)
+					:refs refs))
 		(setf (tp-out t1) (cons ret (tp-out t1)))
 		ret))))
 
 ;;; Given a timepoint t1, creates and returns a new timepoint which is
 ;;; directly before t1 in the graph.
-(defun insert-timepoint-before (t1)
+(defun insert-timepoint-before (t1 &key refs)
   (let ((ret (gensym)))
 	(cond 
 	  ((first-p t1)
@@ -130,17 +134,21 @@
 				   :chain (tp-chain t1)
 				   :next t1
 				   :ptime (1- (tp-ptime t1))
-				   :upper (tp-upper t1)))
+				   :upper (tp-upper t1)
+				   :refs refs))
 	   (setf (tp-prev t1) ret)
 	   ret)
 	  (t
-		(setf ret (make-timepoint :out (list t1) :upper (tp-upper t1)))
+		(setf ret (make-timepoint 
+					:out (list t1) 
+					:upper (tp-upper t1)
+					:refs refs))
 		(setf (tp-inc t1) (cons ret (tp-inc t1)))
 		ret))))
 
 ;;; Given timepoints t1 and t2, creates and returns a new timepoint
 ;;; which is after t1 and before t2.
-(defun insert-timepoint-during (t1 t2)
+(defun insert-timepoint-during (t1 t2 &key refs)
   (let ((ret (gensym)))
 	(cond
 	  ((and *enforce-correctness* (not (tg-before-p t2 t2))) nil)
@@ -152,18 +160,19 @@
 				   :next t2
 				   :ptime (/ (+ (tp-ptime t1) (tp-ptime t2)) 2)
 				   :lower (tp-lower t1)
-				   :upper (tp-upper t2)))
+				   :upper (tp-upper t2)
+				   :refs refs))
 	   (setf (tp-next t1) ret)
 	   (setf (tp-prev t2) ret)
 	   ret)
 	  ((last-p t1)
-	   (setf ret (insert-timepoint-after t1))
+	   (setf ret (insert-timepoint-after t1 :refs refs))
 	   (setf (tp-out ret) (list t2))
 	   (push ret (tp-inc t2))
 	   (setf (tp-upper ret) (tp-upper t2))
 	   (prop-bounds ret))
 	  ((first-p t1)
-	   (setf ret (insert-timepoint-before t2))
+	   (setf ret (insert-timepoint-before t2 :refs refs))
 	   (setf (tp-inc ret) (list t1))
 	   (push ret (tp-out t1))
 	   (setf (tp-lower ret) (tp-lower t1))
@@ -173,18 +182,11 @@
 					:in (list t1)
 					:out (list t2)
 					:lower (tp-lower t1)
-					:upper (tp-upper t2)))
+					:upper (tp-upper t2)
+					:refs refs))
 		(push ret (tp-inc t2))
 		(push ret (tp-out t1))
 		(prop-bounds ret)))))
-
-;;; If t1 and t2 are existing timepoints, assert that t1 is before t2
-(defun assert-before (t1 t2)
-  (when (not (before-p t2 t1))
-
-
-	))
-
 
 ;;; Querying functions
 ;;; note: a lot of this needs error checking
