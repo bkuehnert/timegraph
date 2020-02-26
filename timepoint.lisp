@@ -72,6 +72,24 @@
 		((not (tp-prev t1)) (tp-inc t1))
 		(t (cons (tp-prev t1) (tp-inc t1)))))
 
+;;; Get list of all successors of a timepoint t1
+(defun get-all-successors (t1)
+  (funcall (alambda (t1 seen)
+    (cond 
+	  ((not (gethash t1 seen))
+	   (setf (gethash t1 seen) t)
+	   (cons t1 (mapcar (lambda (tk) (self tk seen)) (get-successors t1))))))
+  t1 (make-hash-table :test #'equal)))
+
+;;; Get list of all ancestors of a timepoint t1
+(defun get-all-successors (t1)
+  (funcall (alambda (t1 seen)
+    (cond 
+	  ((not (gethash t1 seen))
+	   (setf (gethash t1 seen) t)
+	   (cons t1 (mapcar (lambda (tk) (self tk seen)) (get-ancestors t1))))))
+  t1 (make-hash-table :test #'equal)))
+
 ;;; Check if a timepoint t1 is the last in its chain
 (defun last-p (t1)
   (not (tp-next t1)))
@@ -80,6 +98,7 @@
 (defun first-p (t1)
   (not (tp-prev t1)))
 
+;;; Insertion methods
 ;;; -----------------------------------------------------------------------
 
 ;;; Given a timepoint t1, creates and returns a new timepoint which is
@@ -124,7 +143,7 @@
 (defun insert-timepoint-during (t1 t2)
   (let ((ret (gensym)))
 	(cond
-	  ((and *enforce-correctness* (before-p t1 t2)))
+	  ((and *enforce-correctness* (not (tg-before-p t2 t2))) nil)
 	  ((and (equal (tp-chain t1) (tp-chain t2))
 			(equal (tp-next t1) t2))
 	   (setf ret (make-timepoint
@@ -159,22 +178,56 @@
 		(push ret (tp-out t1))
 		(prop-bounds ret)))))
 
-;;; Querying functions 
+;;; If t1 and t2 are existing timepoints, assert that t1 is before t2
+(defun assert-before (t1 t2)
+  (when (not (before-p t2 t1))
+
+
+	))
+
+
+;;; Querying functions
+;;; note: a lot of this needs error checking
 ;;; ----------------------------------------------------------------------
 
 ;;; Returns t if t1 is before (or equal to) t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
-(defun before-p (t1 t2)
-  ((alambda (src dst seen) 
+(defun tg-before-p (t1 t2)
+  (funcall (alambda (src dst seen) 
     (cond
 	  ((and (equal (tp-chain src) (tp-chain dst)))
 	   (<= (tp-ptime src) (tp-ptime dst)))
 	  ((not (gethash src seen))
 	   (setf (gethash src seen) t)
 	   (dolist (node (get-successors src))
-		 (if (get-relation-helper node dst seen)
-		   t))))
-	t1 t2 (make-hash-table :test #'equal))))
+		 (if (self node dst seen)
+		   t)))))
+	t1 t2 (make-hash-table :test #'equal)))
+
+;;; Verify that a list is an atomic proposition of the form (t1 {a,b} t2), 
+;;; which means t1 is {after, before} t2.
+(defun tg-atomic-p (prop) 
+  (and 
+	(= (length prop) 3)
+	(equal (type-of (first prop)) 'timepoint)
+	(equal (type-of (third prop)) 'timepoint)
+	(or (equal (second prop) 'a) (equal (second prop) 'b))))
+
+;;; Evaluate an atomic proposition.
+(defun tg-eval-atomic (atomic)
+  (if (tg-atomic-p atomic)
+	(if (equal (second atomic) 'b)
+	  (tg-before-p (first atomic) (third atomic))
+	  (tg-before-p (third atomic) (first atomic)))))
+
+;;; Verify that a list is a list of lists. 
+;;; **needs to be implemented
+(defun tg-cnf-p (cnf) t)
+
+;;; Evaluate a proposition. A proposition is given in CNF by a list of
+;;; lists of atomics. 
+(defun tg-eval-cnf (cnf)
+  (every (lambda (disj) (some 'tg-eval-atomic disj)) cnf))
   
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
 ;;; between the two timepoints. Possible return values are:
@@ -190,9 +243,13 @@
 	((and (equal (tp-chain t1) (tp-chain t2)) 
 		  (> (tp-ptime t1) (tp-ptime t2))) 2)
 	((equal t1 t2) 3)
-	((before-p t1 t2) 1)
-	((before-p t2 t1) 2)
+	((tg-before-p t1 t2) 1)
+	((tg-before-p t2 t1) 2)
 	(t nil)))
+
+
+;;; Quantitative bounds (needs some work)
+;;; ----------------------------------------------------------------------
 
 (defun insert-lower-bound (t1 bound)
   (progn
