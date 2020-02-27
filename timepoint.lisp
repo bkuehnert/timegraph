@@ -41,11 +41,13 @@
 		  :accessor tp-upper)
    (lower :initarg :lower
 		  :accessor tp-lower)
-   (refs :initarg :refs
-		 :accessor tp-refs)))
+   (brefs :initarg :brefs
+		  :accessor tp-brefs)
+   (erefs :initarg :erefs
+		  :accessor tp-erefs)))
 
 (defun make-timepoint (&key (chain (sxhash (gensym))) 
-							prev next (ptime 1) in out upper lower refs)
+							prev next (ptime 1) in out upper lower brefs erefs)
   (make-instance 'timepoint
 				 :chain chain
 				 :prev prev
@@ -55,7 +57,8 @@
 				 :out out
 				 :upper upper
 				 :lower lower
-				 :refs refs))
+				 :brefs brefs
+				 :erefs erefs))
 
 ;;; Utility Functions
 ;;; -----------------------------------------------------------------------
@@ -74,21 +77,26 @@
 
 ;;; Get list of all successors of a timepoint t1
 (defun get-all-successors (t1)
-  (funcall (alambda (t1 seen)
-    (cond 
-	  ((not (gethash t1 seen))
-	   (setf (gethash t1 seen) t)
-	   (cons t1 (mapcar (lambda (tk) (self tk seen)) (get-successors t1))))))
-  t1 (make-hash-table :test #'equal)))
+  (flatten
+	(funcall 
+	  (alambda (t1 seen)
+	    (cond ((not (gethash t1 seen))
+			   (setf (gethash t1 seen) t)
+			   (cons t1 (mapcar (lambda (tk) 
+								  (self tk seen)) (get-successors t1))))))
+		t1 (make-hash-table :test #'equal))))
 
 ;;; Get list of all ancestors of a timepoint t1
-(defun get-all-successors (t1)
-  (funcall (alambda (t1 seen)
-    (cond 
-	  ((not (gethash t1 seen))
-	   (setf (gethash t1 seen) t)
-	   (cons t1 (mapcar (lambda (tk) (self tk seen)) (get-ancestors t1))))))
-  t1 (make-hash-table :test #'equal)))
+(defun get-all-ancestors (t1)
+  (flatten
+	(funcall 
+	  (alambda (t1 seen)
+	    (cond 
+		  ((not (gethash t1 seen))
+	       (setf (gethash t1 seen) t)
+	       (cons t1 (mapcar (lambda (tk) 
+							  (self tk seen)) (get-ancestors t1))))))
+		t1 (make-hash-table :test #'equal))))
 
 ;;; Check if a timepoint t1 is the last in its chain
 (defun last-p (t1)
@@ -103,7 +111,7 @@
 
 ;;; Given a timepoint t1, creates and returns a new timepoint which is
 ;;; directly after t1 in the graph.
-(defun insert-timepoint-after (t1 &key refs)
+(defun insert-timepoint-after (t1 &key brefs erefs)
   (let ((ret (gensym)))
 	(cond 
 	  ((not t1) nil) ;;; add error message here
@@ -113,20 +121,22 @@
 				   :prev t1
 				   :ptime (1+ (tp-ptime t1))
 				   :lower (tp-lower t1)
-				   :refs refs))
+				   :brefs brefs
+				   :erefs erefs))
 	   (setf (tp-next t1) ret)
 	   ret)
 	  (t
 		(setf ret (make-timepoint 
 					:in (list t1) 
 					:lower (tp-lower t1)
-					:refs refs))
+					:brefs brefs
+					:erefs erefs))
 		(setf (tp-out t1) (cons ret (tp-out t1)))
 		ret))))
 
 ;;; Given a timepoint t1, creates and returns a new timepoint which is
 ;;; directly before t1 in the graph.
-(defun insert-timepoint-before (t1 &key refs)
+(defun insert-timepoint-before (t1 &key brefs erefs)
   (let ((ret (gensym)))
 	(cond 
 	  ((first-p t1)
@@ -135,20 +145,22 @@
 				   :next t1
 				   :ptime (1- (tp-ptime t1))
 				   :upper (tp-upper t1)
-				   :refs refs))
+				   :brefs brefs
+				   :erefs erefs))
 	   (setf (tp-prev t1) ret)
 	   ret)
 	  (t
 		(setf ret (make-timepoint 
 					:out (list t1) 
 					:upper (tp-upper t1)
-					:refs refs))
+					:brefs brefs
+					:erefs erefs))
 		(setf (tp-inc t1) (cons ret (tp-inc t1)))
 		ret))))
 
 ;;; Given timepoints t1 and t2, creates and returns a new timepoint
 ;;; which is after t1 and before t2.
-(defun insert-timepoint-during (t1 t2 &key refs)
+(defun insert-timepoint-during (t1 t2 &key brefs erefs)
   (let ((ret (gensym)))
 	(cond
 	  ((and *enforce-correctness* (not (tg-before-p t2 t2))) nil)
@@ -161,18 +173,19 @@
 				   :ptime (/ (+ (tp-ptime t1) (tp-ptime t2)) 2)
 				   :lower (tp-lower t1)
 				   :upper (tp-upper t2)
-				   :refs refs))
+				   :brefs brefs
+				   :erefs erefs))
 	   (setf (tp-next t1) ret)
 	   (setf (tp-prev t2) ret)
 	   ret)
 	  ((last-p t1)
-	   (setf ret (insert-timepoint-after t1 :refs refs))
+	   (setf ret (insert-timepoint-after t1 :brefs brefs :erefs erefs))
 	   (setf (tp-out ret) (list t2))
 	   (push ret (tp-inc t2))
 	   (setf (tp-upper ret) (tp-upper t2))
 	   (prop-bounds ret))
 	  ((first-p t1)
-	   (setf ret (insert-timepoint-before t2 :refs refs))
+	   (setf ret (insert-timepoint-before t2 :brefs brefs :erefs erefs))
 	   (setf (tp-inc ret) (list t1))
 	   (push ret (tp-out t1))
 	   (setf (tp-lower ret) (tp-lower t1))
@@ -183,10 +196,13 @@
 					:out (list t2)
 					:lower (tp-lower t1)
 					:upper (tp-upper t2)
-					:refs refs))
+					:brefs brefs
+					:erefs erefs))
 		(push ret (tp-inc t2))
 		(push ret (tp-out t1))
 		(prop-bounds ret)))))
+
+
 
 ;;; Querying functions
 ;;; note: a lot of this needs error checking
@@ -224,7 +240,7 @@
 
 ;;; Verify that a list is a list of lists. 
 ;;; **needs to be implemented
-(defun tg-cnf-p (cnf) t)
+;;; (defun tg-cnf-p (cnf) t)
 
 ;;; Evaluate a proposition. A proposition is given in CNF by a list of
 ;;; lists of atomics. 
