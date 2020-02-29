@@ -202,6 +202,22 @@
 		(push ret (tp-out t1))
 		(prop-bounds ret)))))
 
+;;; Given timepoints t1 and t2 such that t1 and t2 have no relation, assert
+;;; that t1 is before t2
+(defun tp-assert-before (t1 t2)
+  (cond
+    ((and (last-p t1) (first-p t2))
+     (setf (tp-next t1) t2)
+     (setf (tp-prev t2) t1)
+     (funcall (alambda (tk ptime hash)
+		(when tk
+		  (setf (tp-ptime tk) (+ ptime (tp-ptime tk)))
+		  (setf (tp-chain tk) hash)
+		  (self (tp-next tk) ptime)))
+      t2 (tp-ptime t1) (tp-chain t1)))
+    (t
+     (push t2 (tp-out t1))
+     (push t1 (tp-inc t2)))))
 
 
 ;;; Querying functions
