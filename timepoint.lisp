@@ -158,54 +158,21 @@
 		(setf (tp-inc t1) (cons ret (tp-inc t1)))
 		ret))))
 
-;;; Given timepoints t1 and t2, creates and returns a new timepoint
-;;; which is after t1 and before t2.
-(defun insert-timepoint-during (t1 t2 &key brefs erefs)
-  (let ((ret (gensym)))
-	(cond
-	  ((and *enforce-correctness* (not (tg-before-p t2 t2))) nil)
-	  ((and (equal (tp-chain t1) (tp-chain t2))
-			(equal (tp-next t1) t2))
-	   (setf ret (make-timepoint
-				   :chain (tp-chain t1)
-				   :prev t1
-				   :next t2
-				   :ptime (/ (+ (tp-ptime t1) (tp-ptime t2)) 2)
-				   :lower (tp-lower t1)
-				   :upper (tp-upper t2)
-				   :brefs brefs
-				   :erefs erefs))
-	   (setf (tp-next t1) ret)
-	   (setf (tp-prev t2) ret)
-	   ret)
-	  ((last-p t1)
-	   (setf ret (insert-timepoint-after t1 :brefs brefs :erefs erefs))
-	   (setf (tp-out ret) (list t2))
-	   (push ret (tp-inc t2))
-	   (setf (tp-upper ret) (tp-upper t2))
-	   (prop-bounds ret))
-	  ((first-p t1)
-	   (setf ret (insert-timepoint-before t2 :brefs brefs :erefs erefs))
-	   (setf (tp-inc ret) (list t1))
-	   (push ret (tp-out t1))
-	   (setf (tp-lower ret) (tp-lower t1))
-	   (prop-bounds t1))
-	  (t
-		(setf ret (make-timepoint
-					:in (list t1)
-					:out (list t2)
-					:lower (tp-lower t1)
-					:upper (tp-upper t2)
-					:brefs brefs
-					:erefs erefs))
-		(push ret (tp-inc t2))
-		(push ret (tp-out t1))
-		(prop-bounds ret)))))
-
-;;; Given timepoints t1 and t2 such that t1 and t2 have no relation, assert
-;;; that t1 is before t2
-(defun tp-assert-before (t1 t2)
+;;; t1 and t2 are timepoints (either are possibly nil), assert that t1 is
+;;; before t2 and return them. Preconditions: If t1 and t2 are not nil,
+;;; then it must be the case that t2 is not before t1, otherwise, the
+;;; timegraph will be in a contradictory state after running this
+;;; function.
+(defun assert-before (t1 t2)
   (cond
+	((and (not t1) (not t2))
+	 (let* ((t1 (make-timepoint))
+			(t2 (insert-timepoint-after t1)))
+	   (list t1 t2)))
+	((not t1)
+	 (list (insert-timepoint-before t2) t2))
+	((not t2)
+	 (list t1 (insert-timepoint-after t1)))
     ((and (last-p t1) (first-p t2))
      (setf (tp-next t1) t2)
      (setf (tp-prev t2) t1)
@@ -213,20 +180,71 @@
 		(when tk
 		  (setf (tp-ptime tk) (+ ptime (tp-ptime tk)))
 		  (setf (tp-chain tk) hash)
-		  (self (tp-next tk) ptime)))
+		  (self (tp-next tk) ptime hash)))
       t2 (tp-ptime t1) (tp-chain t1)))
     (t
      (push t2 (tp-out t1))
      (push t1 (tp-inc t2)))))
 
+;;; t1 and t2 are timepoints (either are possibly nil), assert that t1 is
+;;; equal to t2 and return (t1 t2). Preconditions: none. Function also
+;;; requires reference to a timegraph tg, since updates to the timegraph's
+;;; references are needed in some cases.
+(defun assert-equal (tg t1 t2)
+  (cond 
+	((and (not t1) (not t2))
+	 (let ((t1 (make-timepoint)))
+	   (list t1 t1)))
+	((not t1)
+	 (list t2 t2))
+	((not t2)
+	 (list t1 t1))
+	((before-p t1 t2)
+	 (tp-assert-equal-helper tg t1 t2)
+	 (list t1 t2))
+	((before-p t2 t1)
+	 (tp-assert-equal-helper tg t2 t1)
+	 (list t1 t2))))
+
+;;; In the case that t1 and t2 exist and t2 is after t1, then in order
+;;; to assert tat t1 = t2, all timepoints between t2 and t1 must be
+;;; set equal to eachother (and thus equal to t1). This helper function
+;;; searches for such points and updates their references with a given
+;;; timegraph object tg.
+(defun tp-assert-equal-helper (tg t1 t2)
+  (let* ((t1suc (get-all-successors t1))
+		 (t2anc (get-all-ancestors t2))
+		 (quo (intersection t1suc t2anc)))
+	(dolist (tk quo)
+	  (when (tp-prev tk)
+		(setf (tp-inc t1) (adjoin (tp-prev tk) (tp-inc t1)))
+		(setf (tp-out (tp-prev tk)) (adjoin tk (tp-out (tp-prev tk))))
+		(setf (tp-next (tp-prev tk)) nil))
+	  (when (tp-next tk)
+		(setf (tp-inc t1) (adjoin (tp-prev tk) (tp-inc t1)))
+		(setf (tp-out (tp-prev tk)) (adjoin tk (tp-out (tp-prev tk))))
+		(setf (tp-prev (tp-next tk)) nil))
+
+	  (setf (tp-inc t1) (union (tp-inc t1)
+				   (remove-if (lambda (x) (member x quo))
+						    (tp-inc tk))))
+	  (setf (tp-out t1) (union (tp-out t1)
+				   (remove-if (lambda (x) (member x quo))
+						    (tp-out tk))))
+
+	  (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
+	  (setf (tp-erefs t1) (union (tp-erefs t1) (tp-erefs tk)))
+	  (dolist (bref (tp-brefs tk))
+		(setf (gethash bref (first tg)) t1))
+	  (dolist (eref (tp-erefs tk))
+		(setf (gethash eref (second tg)) t1)))))
 
 ;;; Querying functions
-;;; note: a lot of this needs error checking
 ;;; ----------------------------------------------------------------------
 
 ;;; Returns t if t1 is before (or equal to) t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
-(defun tg-before-p (t1 t2)
+(defun before-p (t1 t2)
   (funcall (alambda (src dst seen) 
     (cond
 	  ((and (equal (tp-chain src) (tp-chain dst)))
@@ -238,31 +256,11 @@
 		   t)))))
 	t1 t2 (make-hash-table :test #'equal)))
 
-;;; Verify that a list is an atomic proposition of the form (t1 {a,b} t2), 
-;;; which means t1 is {after, before} t2.
-(defun tg-atomic-p (prop) 
-  (and 
-	(= (length prop) 3)
-	(equal (type-of (first prop)) 'timepoint)
-	(equal (type-of (third prop)) 'timepoint)
-	(or (equal (second prop) 'a) (equal (second prop) 'b))))
+;;; Returns t if and only if t2 is strictly before t1
+(defun not-before-p (t1 t2) 
+  (and (not (equal t1 t2))
+	   (before-p t2 t1)))
 
-;;; Evaluate an atomic proposition.
-(defun tg-eval-atomic (atomic)
-  (if (tg-atomic-p atomic)
-	(if (equal (second atomic) 'b)
-	  (tg-before-p (first atomic) (third atomic))
-	  (tg-before-p (third atomic) (first atomic)))))
-
-;;; Verify that a list is a list of lists. 
-;;; **needs to be implemented
-;;; (defun tg-cnf-p (cnf) t)
-
-;;; Evaluate a proposition. A proposition is given in CNF by a list of
-;;; lists of atomics. 
-(defun tg-eval-cnf (cnf)
-  (every (lambda (disj) (some 'tg-eval-atomic disj)) cnf))
-  
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
 ;;; between the two timepoints. Possible return values are:
 ;;; 	- nil : no relation found
