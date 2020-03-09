@@ -163,7 +163,7 @@
 ;;; then it must be the case that t2 is not before t1, otherwise, the
 ;;; timegraph will be in a contradictory state after running this
 ;;; function.
-(defun assert-before (t1 t2)
+(defun tp-assert-before (t1 t2)
   (cond
 	((and (not t1) (not t2))
 	 (let* ((t1 (make-timepoint))
@@ -190,7 +190,7 @@
 ;;; equal to t2 and return (t1 t2). Preconditions: none. Function also
 ;;; requires reference to a timegraph tg, since updates to the timegraph's
 ;;; references are needed in some cases.
-(defun assert-equal (tg t1 t2)
+(defun tp-assert-equal (tg t1 t2)
   (cond 
 	((and (not t1) (not t2))
 	 (let ((t1 (make-timepoint)))
