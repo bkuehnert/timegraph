@@ -190,7 +190,7 @@
 ;;; equal to t2 and return (t1 t2). Preconditions: none. Function also
 ;;; requires reference to a timegraph tg, since updates to the timegraph's
 ;;; references are needed in some cases.
-(defun tp-assert-equal (tg t1 t2)
+(defun tp-assert-equals (tg t1 t2)
   (cond 
 	((and (not t1) (not t2))
 	 (let ((t1 (make-timepoint)))
