@@ -242,7 +242,7 @@
 ;;; Querying functions
 ;;; ----------------------------------------------------------------------
 
-;;; Returns t if t1 is before (or equal to) t2. Returns nil if t1 is after
+;;; Returns t if t1 is before or equal to t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
 (defun before-p (t1 t2)
   (funcall (alambda (src dst seen) 
@@ -256,16 +256,28 @@
 		   t)))))
 	t1 t2 (make-hash-table :test #'equal)))
 
-;;; Returns t if and only if t2 is strictly before t1
+;;; Returns t if and only if the timegraph contains evidence that t1 is 
+;;; not before t2.
 (defun not-before-p (t1 t2) 
   (and (not (equal t1 t2))
 	   (before-p t2 t1)))
 
+;;; Returns t if t1 is equal to t2. Returns nil if the inference cannot be
+;;; made.
+(defun equal-p (t1 t2)
+  (equal t1 t2))
+
+;;; Returns t if the inference that t1 is not equal to t2 can be made. 
+;;; Note: due to the strength of timegraph, this inference can never be
+;;; made.
+(defun not-equal-p (t1 t2)
+  nil)
+
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
 ;;; between the two timepoints. Possible return values are:
 ;;; 	- nil : no relation found
-;;; 	- 1   : t1 before t2
-;;;     - 2   : t1 after t2 (t2 before t1)
+;;; 	- 1   : t1 before or equals t2
+;;;     - 2   : t1 after or equals t2 
 ;;;     - 3   : t1 equal to t2
 (defun get-relation (t1 t2)
   (cond
