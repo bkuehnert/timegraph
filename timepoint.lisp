@@ -199,10 +199,10 @@
 	 (list t2 t2))
 	((not t2)
 	 (list t1 t1))
-	((before-p t1 t2)
+	((tp-before-p t1 t2)
 	 (tp-assert-equal-helper tg t1 t2)
 	 (list t1 t2))
-	((before-p t2 t1)
+	((tp-before-p t2 t1)
 	 (tp-assert-equal-helper tg t2 t1)
 	 (list t1 t2))))
 
@@ -270,7 +270,7 @@
 ;;; Returns t if the inference that t1 is not equal to t2 can be made. 
 ;;; Note: due to the strength of timegraph, this inference can never be
 ;;; made.
-(defun not-equal-p (t1 t2)
+(defun tp-not-equals-p (t1 t2)
   nil)
 
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
