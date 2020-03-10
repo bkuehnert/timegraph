@@ -244,7 +244,7 @@
 
 ;;; Returns t if t1 is before or equal to t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
-(defun before-p (t1 t2)
+(defun tp-before-p (t1 t2)
   (funcall (alambda (src dst seen) 
     (cond
 	  ((and (equal (tp-chain src) (tp-chain dst)))
@@ -258,13 +258,13 @@
 
 ;;; Returns t if and only if the timegraph contains evidence that t1 is 
 ;;; not before t2.
-(defun not-before-p (t1 t2) 
+(defun tp-not-before-p (t1 t2) 
   (and (not (equal t1 t2))
-	   (before-p t2 t1)))
+	   (tp-before-p t2 t1)))
 
 ;;; Returns t if t1 is equal to t2. Returns nil if the inference cannot be
 ;;; made.
-(defun equal-p (t1 t2)
+(defun tp-equals-p (t1 t2)
   (equal t1 t2))
 
 ;;; Returns t if the inference that t1 is not equal to t2 can be made. 
@@ -287,8 +287,8 @@
 	((and (equal (tp-chain t1) (tp-chain t2)) 
 		  (> (tp-ptime t1) (tp-ptime t2))) 2)
 	((equal t1 t2) 3)
-	((tg-before-p t1 t2) 1)
-	((tg-before-p t2 t1) 2)
+	((tp-before-p t1 t2) 1)
+	((tp-before-p t2 t1) 2)
 	(t nil)))
 
 
