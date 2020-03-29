@@ -8,6 +8,9 @@
   (list (make-hash-table :test #'equal)
 		(make-hash-table :test #'equal)))
 
+; Assertion Functions
+; -------------------------------------------------------------------------
+
 ;;; For two epsiodes e1 and e2, assert that
 ;;; e1.st <= e1.end = e2.st <= e2.end
 (defun ep-assert-consec (tg e1 e2)
@@ -119,6 +122,8 @@
 	(push e1 (tp-erefs t2))
 	(push e2 (tp-erefs t4))))
 
+
+; Querying functions
 ; -------------------------------------------------------------------------
 
 (defun ep-consec-p (tg e1 e2)
@@ -209,7 +214,7 @@
 		 (tp-before-p e1end e2str)
 		 (tp-before-p e2str e2end))))
 
-(defun ep-not-consec-p (tg e1 e2)
+(defun ep-not-precond-of-p (tg e1 e2)
   (let ((e1str (gethash e1 (first tg)))
 		(e1end (gethash e1 (second tg)))
 		(e2str (gethash e2 (first tg)))
