@@ -1,8 +1,5 @@
 (load "macro.lisp")
 
-;;; If true, will not allow inconsistent relations to be added.
-(defvar *enforce-correctness* t) 
-
 ;;; * chain: Unique chain identifier. Two timepoints will have the same
 ;;;   chain value iff they are on the same chain.
 ;;;
@@ -165,14 +162,20 @@
 ;;; function.
 (defun tp-assert-before (t1 t2)
   (cond
+	((tp-before-p t1 t2)
+	 (list t1 t2))
+
 	((and (not t1) (not t2))
 	 (let* ((t1 (make-timepoint))
 			(t2 (insert-timepoint-after t1)))
 	   (list t1 t2)))
+
 	((not t1)
 	 (list (insert-timepoint-before t2) t2))
+
 	((not t2)
 	 (list t1 (insert-timepoint-after t1)))
+
     ((and (last-p t1) (first-p t2))
      (setf (tp-next t1) t2)
      (setf (tp-prev t2) t1)
@@ -182,6 +185,7 @@
 		  (setf (tp-chain tk) hash)
 		  (self (tp-next tk) ptime hash)))
       t2 (tp-ptime t1) (tp-chain t1)))
+
     (t
      (push t2 (tp-out t1))
      (push t1 (tp-inc t2)))))
@@ -192,16 +196,23 @@
 ;;; references are needed in some cases.
 (defun tp-assert-equals (tg t1 t2)
   (cond 
+	((tp-equals-p t1 t2)
+	 (list t1 t2))
+
 	((and (not t1) (not t2))
 	 (let ((t1 (make-timepoint)))
 	   (list t1 t1)))
+
 	((not t1)
 	 (list t2 t2))
+
 	((not t2)
 	 (list t1 t1))
+
 	((tp-before-p t1 t2)
 	 (tp-assert-equal-helper tg t1 t2)
 	 (list t1 t2))
+
 	((tp-before-p t2 t1)
 	 (tp-assert-equal-helper tg t2 t1)
 	 (list t1 t2))))
@@ -245,16 +256,19 @@
 ;;; Returns t if t1 is before or equal to t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
 (defun tp-before-p (t1 t2)
-  (funcall (alambda (src dst seen) 
-    (cond
-	  ((and (equal (tp-chain src) (tp-chain dst)))
-	   (<= (tp-ptime src) (tp-ptime dst)))
-	  ((not (gethash src seen))
-	   (setf (gethash src seen) t)
-	   (dolist (node (get-successors src))
-		 (if (self node dst seen)
-		   t)))))
-	t1 t2 (make-hash-table :test #'equal)))
+  (if (or (not t1) (not t2))
+	nil
+	(funcall 
+	  (alambda (src dst seen) 
+	    (cond
+		  ((and (equal (tp-chain src) (tp-chain dst)))
+		   (<= (tp-ptime src) (tp-ptime dst)))
+		  ((not (gethash src seen))
+		   (setf (gethash src seen) t)
+		   (dolist (node (get-successors src))
+			 (if (self node dst seen)
+			   t)))))
+	  t1 t2 (make-hash-table :test #'equal))))
 
 ;;; Returns t if and only if the timegraph contains evidence that t1 is 
 ;;; not before t2.
@@ -265,7 +279,9 @@
 ;;; Returns t if t1 is equal to t2. Returns nil if the inference cannot be
 ;;; made.
 (defun tp-equals-p (t1 t2)
-  (equal t1 t2))
+  (if (or (not t1) (not t2))
+	nil
+  	(equal t1 t2)))
 
 ;;; Returns t if the inference that t1 is not equal to t2 can be made. 
 ;;; Note: due to the strength of timegraph, this inference can never be
@@ -279,6 +295,7 @@
 ;;; 	- 1   : t1 before or equals t2
 ;;;     - 2   : t1 after or equals t2 
 ;;;     - 3   : t1 equal to t2
+
 (defun get-relation (t1 t2)
   (cond
 	((or (not t1) (not t2)) nil)
@@ -295,48 +312,48 @@
 ;;; Quantitative bounds (needs some work)
 ;;; ----------------------------------------------------------------------
 
-(defun insert-lower-bound (t1 bound)
-  (progn
-	(setf (tp-lower t1) bound)
-	(prop-lower-bound t1)))
-
-(defun insert-upper-bound (t1 bound)
-  (progn
-	(setf (tp-upper t1) bound)
-	(prop-upper-bound t1)))
-
-;;; Propogate lower bound
-(defun prop-lower-bound (t1)
-  (dolist (tk (get-successors t1))
-	(prop-bound-down tk  (tp-lower t1))))
-
-;;; Propogate upper bound
-(defun prop-upper-bound (t1)
-  (dolist (tk (get-ancestors t1))
-	(prop-bound-up tk (tp-upper t1))))
-
-(defun prop-bounds (t1)
-  (progn
-	(prop-upper-bound t1)
-	(prop-lower-bound t1)))
-
+;(defun insert-lower-bound (t1 bound)
+;  (progn
+;	(setf (tp-lower t1) bound)
+;	(prop-lower-bound t1)))
+;
+;(defun insert-upper-bound (t1 bound)
+;  (progn
+;	(setf (tp-upper t1) bound)
+;	(prop-upper-bound t1)))
+;
+;;;; Propogate lower bound
+;(defun prop-lower-bound (t1)
+;  (dolist (tk (get-successors t1))
+;	(prop-bound-down tk  (tp-lower t1))))
+;
+;;;; Propogate upper bound
+;(defun prop-upper-bound (t1)
+;  (dolist (tk (get-ancestors t1))
+;	(prop-bound-up tk (tp-upper t1))))
+;
+;(defun prop-bounds (t1)
+;  (progn
+;	(prop-upper-bound t1)
+;	(prop-lower-bound t1)))
+;
 ;;; Propogate timebounds up
-(defun prop-bound-down (t1 bound)
-  (cond 
-	((not t1) nil)
-	((or (not (tp-lower t1)) (< (tp-lower t1) bound))
-	 (setf (tp-lower t1) bound)
-	 (dolist (tk (get-successors t1)) 
-	   (prop-bound-down tk bound)))))
-
-;;; Propogate timebounds down
-(defun prop-bound-up (t1 bound)
-  (cond
-	((not t1) nil)
-	((or (not (tp-upper t1)) (> (tp-upper t1) bound))
-	 (setf (tp-upper t1) bound)
-	 (dolist (tk (get-ancestors t1)) 
-	   (prop-bound-up tk bound)))))
+;(defun prop-bound-down (t1 bound)
+;  (cond 
+;	((not t1) nil)
+;	((or (not (tp-lower t1)) (< (tp-lower t1) bound))
+;	 (setf (tp-lower t1) bound)
+;	 (dolist (tk (get-successors t1)) 
+;	   (prop-bound-down tk bound)))))
+;
+;;;; Propogate timebounds down
+;(defun prop-bound-up (t1 bound)
+;  (cond
+;	((not t1) nil)
+;	((or (not (tp-upper t1)) (> (tp-upper t1) bound))
+;	 (setf (tp-upper t1) bound)
+;	 (dolist (tk (get-ancestors t1)) 
+;	   (prop-bound-up tk bound)))))
 
 ;;; testing functions
 ;;; -----------------------------------------------------------------------
