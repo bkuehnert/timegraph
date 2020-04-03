@@ -10,3 +10,7 @@
                    ((atom x) (cons x acc))
                    (t (rec (car x) (rec (cdr x) acc))))))
     (rec x nil)))
+
+;; if x is nil, return 0
+(defun fixnil (x)
+  (if x x 0))
