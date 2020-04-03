@@ -237,3 +237,98 @@
 		(tp-not-before-p e1end e2str)
 		(tp-not-before-p e2str e2end))))
 
+
+; Quantitative Bounding functions
+; -------------------------------------------------------------------------
+
+(defun set-lower-timebound (tg tp bound)
+  (setf (gethash tp (tg-lower tg)) bound))
+
+(defun set-upper-timebound (tg tp bound)
+  (setf (gethash tp (tg-upper tg)) bound))
+
+(defun set-lower-duration (tg t1 t2 bound) 
+  (setf (gethash (list t1 t2) (tg-lower tg)) bound))
+
+(defun set-upper-duration (tg t1 t2 bound) 
+  (setf (gethash (list t1 t2) (tg-upper tg)) bound))
+
+(defun get-lower-timebound (tg tp)
+  (gethash tp (tg-lower tg)))
+
+(defun get-upper-timebound (tg tp)
+  (gethash tp (tg-upper tg)))
+
+(defun get-lower-duration (tg t1 t2) 
+  (gethash (list t1 t2) (tg-lower tg)))
+
+(defun get-upper-duration (tg t1 t2) 
+  (gethash (list t1 t2) (tg-upper tg)))
+
+(defun insert-lower-bound (tg tp bound)
+  (let ((l1 (get-lower-timebound tg tp))
+		(u1 (get-upper-timebound tg tp)))
+	(when (or (not l1) (< l1 bound))
+	  (set-lower-timebound tg tp bound)
+	  (dolist (tk (get-successors tp))
+		(let ((l2 (get-lower-timebound tg tk))
+			  (u2 (get-upper-timebound tg tk))
+			  (l (get-lower-duration tg tp tk))
+			  (u (get-upper-duration tg tp tk)))
+		  (if (or (not l2) (< l1 (+ l1 (fixnil l))))
+			(insert-lower-bound tg tk (+ l1 (fixnil l))))
+		  (refresh-optimal-duration tg tp tk))))))
+
+(defun insert-upper-bound (tg tp bound)
+  (let ((l2 (get-lower-timebound tg tp))
+		(u2 (get-upper-timebound tg tp)))
+	(when (or (not u2) (> u2 bound))
+	  (set-upper-timebound tg tp bound)
+	  (dolist (tk (get-ancestors tp))
+		(let* ((l1 (get-lower-timebound tg tk))
+			   (u1 (get-upper-timebound tg tk))
+			   (l (get-lower-duration tg tp tk))
+			   (u (get-upper-duration tg tp tk)))
+		  (if (or (not u1) (> u1 (- u2 (fixnil u))))
+			(insert-upper-bound tg tk (u l2 (fixnil u))))
+		  (refresh-optimal-duration tg tk tp))))))
+
+(defun insert-lower-duration (tg t1 t2 bound)
+  (let ((l1 (get-lower-timebound tg t1))
+		(u1 (get-upper-timeboung tg t1))
+		(l2 (get-lower-timeboung tg t2))
+		(u2 (get-upper-timeboung tg t2))
+		(l (get-lower-duration tg t1 t2)))
+
+	(when (or (not l) (< l bound))
+	  (if (and (not l1) (or (not l2) (< l2 (+ bound l1)))) 
+		(insert-lower-bound tg t2 (+ bound l1)))
+	  (if (and (not u2) (or (not u1) (> u1 (- u2 bound))))
+		(insert-upper-bound tg t1 (- u2 bound))))))
+
+(defun insert-upper-duration (tg t1 t2 bound)
+  (let ((l1 (get-lower-timebound tg t1))
+		(u1 (get-upper-timeboung tg t1))
+		(l2 (get-lower-timeboung tg t2))
+		(u2 (get-upper-timeboung tg t2))
+		(u (get-upper-duration tg t1 t2)))
+
+	(when (or (not u) (> u bound))
+	  (if (and (not u1) (or (not u2) (> u2 (+ bound u1)))) 
+		(insert-upper-bound tg t2 (+ bound u1)))
+	  (if (and (not l2) (or (not l1) (< l1 (- l2 bound))))
+		(insert-lower-bound tg t1 (- l2 bound))))))
+  
+
+(defun refresh-optimal-duration (tg t1 t2)
+  (let ((l1 (get-lower-timebound tg t1))
+		(u1 (get-upper-timeboung tg t1))
+		(l2 (get-lower-timeboung tg t2))
+		(u2 (get-upper-timeboung tg t2))
+		(l (get-lower-duration tg t1 t2))
+		(u (get-upper-duration tg t1 t2)))
+
+	(if (or (not l) (and l2 u1 (< l (- l2 u1))))
+	  (set-lower-duration tg t1 t2 (- l2 u1)))
+	(if (or (not u) (and u2 l1 (> u (- u2 l1))))
+	  (set-upper-duration tg t1 t2 (- u2 l1)))))
