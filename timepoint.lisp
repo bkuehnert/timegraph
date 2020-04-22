@@ -34,10 +34,6 @@
 		:accessor tp-inc)
    (out :initarg :out
 		:accessor tp-out)
-   (upper :initarg :upper
-		  :accessor tp-upper)
-   (lower :initarg :lower
-		  :accessor tp-lower)
    (brefs :initarg :brefs
 		  :accessor tp-brefs)
    (erefs :initarg :erefs
@@ -255,7 +251,8 @@
 
 ;;; Returns t if t1 is before or equal to t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
-(defun tp-before-p (t1 t2)
+;;; todo: add shortcut if quant bounds allow it (with optional tg reference)
+(defun tp-before-p (t1 t2 (&optional tg))
   (if (or (not t1) (not t2))
 	nil
 	(funcall 

@@ -21,6 +21,32 @@
 				 :upper (make-hash-table :test #'equal)
 				 :lower (make-hash-table :test #'equal)))
 
+; Accessor functions
+(defun get-str (tg e1)
+  (gethash e1 (tg-str tg)))
+
+(defun get-end (tg e1)
+  (gethash e1 (tg-end tg)))
+
+(defun get-upper (tg p)
+  (gethash p (tg-upper tg)))
+
+(defun get-lower (tg p x)
+  (setf (gethash p (tg-lower tg)) x))
+
+(defun set-upper (tg p x)
+  (setf (gethash p (tg-upper tg)) x))
+
+(defun set-lower (tg p x)
+  (setf (gethash p (tg-lower tg)) x))
+
+(defun set-str (tg e1 tp)
+  (setf (gethash e1 (tg-str tg)) tp))
+
+(defun set-end (tg e1 tp)
+  (setf (gethash e1 (tg-end tg)) tp))
+
+
 ; Assertion Functions
 ; -------------------------------------------------------------------------
 
