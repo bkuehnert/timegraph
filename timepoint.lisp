@@ -178,11 +178,13 @@
 		  (setf (tp-ptime tk) (+ ptime (tp-ptime tk)))
 		  (setf (tp-chain tk) hash)
 		  (self (tp-next tk) ptime hash)))
-      t2 (tp-ptime t1) (tp-chain t1)))
+      t2 (tp-ptime t1) (tp-chain t1))
+	 (list t1 t2))
 
     (t
      (push t2 (tp-out t1))
-     (push t1 (tp-inc t2)))))
+     (push t1 (tp-inc t2))
+	 (list t1 t2))))
 
 ;;; t1 and t2 are timepoints (either are possibly nil), assert that t1 is
 ;;; equal to t2 and return (t1 t2). Preconditions: none. Function also

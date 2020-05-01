@@ -88,10 +88,10 @@
 		  (set-end tg e1 t2)
 		  (set-str tg e2 t3)
 		  (set-end tg e2 t4)
-		  (push e1 (tp-brefs t1))
-		  (push e1 (tp-erefs t2))
-		  (push e2 (tp-brefs t3))
-		  (push e2 (tp-erefs t4)))))
+		  (setf (tp-brefs t1) (adjoin e1 (tp-brefs t1)))
+		  (setf (tp-erefs t2) (adjoin e1 (tp-brefs t2)))
+		  (setf (tp-brefs t3) (adjoin e2 (tp-brefs t3)))
+		  (setf (tp-erefs t4) (adjoin e2 (tp-brefs t4))))))
 
 	  (eval 
 		`(lambda (tg e1 e2)
@@ -120,7 +120,8 @@
 				  conditions))))))))
 
 (create-ep-constraint "EQUALS" `((1 t1 t2) (0 t1 t3) (0 t2 t4)))
-(create-ep-constraint "BEFORE" `((1 t1 t2) (1 t3 t4) (1 t1 t3)))
+(create-ep-constraint "BEFORE" `((1 t1 t2) (1 t3 t4) ;(1 t1 t3)
+										   ))
 (create-ep-constraint "AT-ABOUT" `((1 t1 t2) (1 t3 t4) (1 t3 t1) (1 t2 t4)))
 (create-ep-constraint "PRECOND-OF" `((1 t1 t2) (1 t2 t3) (1 t3 t4)))
 
