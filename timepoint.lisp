@@ -40,7 +40,8 @@
 		  :accessor tp-erefs)))
 
 (defun make-timepoint (&key (chain (sxhash (gensym))) 
-							prev next (ptime 1) in out upper lower brefs erefs)
+							prev next (ptime 1) in out ;upper lower 
+							brefs erefs)
   (make-instance 'timepoint
 				 :chain chain
 				 :prev prev
@@ -48,8 +49,8 @@
 				 :ptime ptime
 				 :inc in
 				 :out out
-				 :upper upper
-				 :lower lower
+				 ;:upper upper
+				 ;:lower lower
 				 :brefs brefs
 				 :erefs erefs))
 
@@ -113,7 +114,6 @@
 				   :chain (tp-chain t1)
 				   :prev t1
 				   :ptime (1+ (tp-ptime t1))
-				   :lower (tp-lower t1)
 				   :brefs brefs
 				   :erefs erefs))
 	   (setf (tp-next t1) ret)
@@ -121,7 +121,6 @@
 	  (t
 		(setf ret (make-timepoint 
 					:in (list t1) 
-					:lower (tp-lower t1)
 					:brefs brefs
 					:erefs erefs))
 		(setf (tp-out t1) (cons ret (tp-out t1)))
@@ -137,7 +136,6 @@
 				   :chain (tp-chain t1)
 				   :next t1
 				   :ptime (1- (tp-ptime t1))
-				   :upper (tp-upper t1)
 				   :brefs brefs
 				   :erefs erefs))
 	   (setf (tp-prev t1) ret)
@@ -145,7 +143,6 @@
 	  (t
 		(setf ret (make-timepoint 
 					:out (list t1) 
-					:upper (tp-upper t1)
 					:brefs brefs
 					:erefs erefs))
 		(setf (tp-inc t1) (cons ret (tp-inc t1)))
@@ -252,7 +249,7 @@
 ;;; Returns t if t1 is before or equal to t2. Returns nil if t1 is after
 ;;; t2 or there is no relation found.
 ;;; todo: add shortcut if quant bounds allow it (with optional tg reference)
-(defun tp-before-p (t1 t2 (&optional tg))
+(defun tp-before-p (t1 t2)
   (if (or (not t1) (not t2))
 	nil
 	(funcall 
