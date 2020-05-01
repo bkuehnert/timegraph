@@ -155,8 +155,6 @@
 ;;; function.
 (defun tp-assert-before (t1 t2)
   (cond
-	((tp-before-p t1 t2)
-	 (list t1 t2))
 
 	((and (not t1) (not t2))
 	 (let* ((t1 (make-timepoint))
@@ -168,6 +166,9 @@
 
 	((not t2)
 	 (list t1 (insert-timepoint-after t1)))
+
+	((tp-before-p t1 t2)
+	 (list t1 t2))
 
     ((and (last-p t1) (first-p t2))
      (setf (tp-next t1) t2)
