@@ -205,13 +205,10 @@
 	((not t2)
 	 (list t1 t1))
 
-	((tp-before-p t1 t2)
-	 (tp-assert-equal-helper tg t1 t2)
-	 (list t1 t2))
-
-	((tp-before-p t2 t1)
-	 (tp-assert-equal-helper tg t2 t1)
-	 (list t1 t2))))
+	(t
+	  (tp-assert-before t1 t2)
+	  (tp-assert-equal-helper tg t1 t2)
+	  (list t1 t2))))
 
 ;;; In the case that t1 and t2 exist and t2 is after t1, then in order
 ;;; to assert tat t1 = t2, all timepoints between t2 and t1 must be
@@ -242,9 +239,9 @@
 	  (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
 	  (setf (tp-erefs t1) (union (tp-erefs t1) (tp-erefs tk)))
 	  (dolist (bref (tp-brefs tk))
-		(setf (gethash bref (first tg)) t1))
+		(set-str tg bref t1))
 	  (dolist (eref (tp-erefs tk))
-		(setf (gethash eref (second tg)) t1)))))
+		(set-end tg eref t1)))))
 
 ;;; Querying functions
 ;;; ----------------------------------------------------------------------
@@ -255,17 +252,19 @@
 (defun tp-before-p (t1 t2)
   (if (or (not t1) (not t2))
 	nil
+	(block loops
 	(funcall 
 	  (alambda (src dst seen) 
 	    (cond
 		  ((and (equal (tp-chain src) (tp-chain dst)))
-		   (<= (tp-ptime src) (tp-ptime dst)))
+		   (return-from loops (<= (tp-ptime src) (tp-ptime dst))))
 		  ((not (gethash src seen))
 		   (setf (gethash src seen) t)
 		   (dolist (node (get-successors src))
-			 (if (self node dst seen)
-			   t)))))
-	  t1 t2 (make-hash-table :test #'equal))))
+			 (when (self node dst seen)
+			   ;(format t "Searching ~A before ~A" node dst)
+			   (return-from loops t))))))
+	  t1 t2 (make-hash-table :test #'equal)))))
 
 ;;; Returns t if and only if the timegraph contains evidence that t1 is 
 ;;; not before t2.
