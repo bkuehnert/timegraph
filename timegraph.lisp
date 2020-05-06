@@ -120,28 +120,30 @@
 				  conditions))))))))
 
 (create-ep-constraint "EQUALS" `((1 t1 t2) (0 t1 t3) (0 t2 t4)))
-(create-ep-constraint "BEFORE" `((1 t1 t2) (1 t3 t4) ;(1 t1 t3)
-										   ))
+(create-ep-constraint "BEFORE" `((1 t1 t2) (1 t3 t4) (1 t1 t3)))
+(create-ep-constraint "AFTER" `((1 t1 t2) (1 t3 t4) (1 t3 t1)))
+(create-ep-constraint "CONSEC" `((1 t1 t2) (1 t3 t4) (0 t2 t3)))
 (create-ep-constraint "AT-ABOUT" `((1 t1 t2) (1 t3 t4) (1 t3 t1) (1 t2 t4)))
 (create-ep-constraint "PRECOND-OF" `((1 t1 t2) (1 t2 t3) (1 t3 t4)))
+(create-ep-constraint "POSTCOND-OF" `((1 t1 t2) (1 t4 t1) (1 t3 t4)))
 
 ; Utility Functions
 ; -------------------------------------------------------------------------
 
-(defun time-prop-p (prop)
+(defun tg-time-prop-p (prop)
   (and 
 	(listp prop)
 	(equal (list-length prop) 3)
 	(gethash (second prop) *TG-CONSTRAINTS*)))
 
-(defun assert-prop (prop tg)
+(defun tg-assert-prop (prop tg)
   (funcall (first (gethash (second prop) *TG-CONSTRAINTS*))
 		   tg (first prop) (third prop)))
 
-(defun eval-prop (prop tg)
+(defun tg-eval-prop (prop tg)
   (let ((tuple (gethash (second prop) *TG-CONSTRAINTS*))
 		(e1 (first prop))
-		(e2 (second prop)))
+		(e2 (third prop)))
 	(cond
 	  ((funcall (second tuple) tg e1 e2) 1)
 	  ((funcall (third tuple) tg e1 e2) 0)
