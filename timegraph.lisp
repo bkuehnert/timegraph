@@ -62,27 +62,27 @@
 
 (defun create-ep-constraint (name conditions)
   (setf
-	(gethash (intern name) *TG-CONSTRAINTS*)
-	(list
-	  (eval `(lambda (tg e1 e2)
-		(let*
-		  ,(append `((t1 (get-str tg e1))
-					 (t2 (get-end tg e1))
-					 (t3 (get-str tg e2))
-					 (t4 (get-end tg e2)))
-				   (apply #'append
-					 (mapcar (lambda (con)
-				       (cond
-						 ; add an error check here
-						 ((equal (first con) 0)
-						  `((pair (tp-assert-equals tg ,(second con) ,(third con)))
-							(,(second con) (first pair))
-							(,(third con) (second pair))))
-						 ((equal (first con) 1)
-						  `((pair (tp-assert-before ,(second con) ,(third con)))
-							(,(second con) (first pair))
-							(,(third con) (second pair))))))
-							 conditions)))
+   (gethash (intern name) *TG-CONSTRAINTS*)
+   (list
+    (eval `(lambda (tg e1 e2)
+	     (let*
+		 ,(append `((t1 (get-str tg e1))
+			    (t2 (get-end tg e1))
+			    (t3 (get-str tg e2))
+			    (t4 (get-end tg e2)))
+			  (apply #'append
+				 (mapcar (lambda (con)
+					   (cond
+					; add an error check here
+					     ((equal (first con) 0)
+					      `((pair (tp-assert-equals tg ,(second con) ,(third con)))
+						(,(second con) (first pair))
+						(,(third con) (second pair))))
+					     ((equal (first con) 1)
+					      `((pair (tp-assert-before ,(second con) ,(third con)))
+						(,(second con) (first pair))
+						(,(third con) (second pair))))))
+					 conditions)))
 
 		  (set-str tg e1 t1)
 		  (set-end tg e1 t2)
@@ -120,8 +120,6 @@
 				  conditions))))))))
 
 
-;;; TESTING CHANGE
-;(create-ep-constraint "EQUALS" `((1 t1 t2) (0 t1 t3)))
 (create-ep-constraint "EQUALS" `((1 t1 t2) (0 t1 t3) (0 t2 t4)))
 (create-ep-constraint "BEFORE" `((1 t1 t3) (1 t1 t2) (1 t3 t4)))
 (create-ep-constraint "AFTER" `((1 t1 t2) (1 t3 t4) (1 t3 t1)))
