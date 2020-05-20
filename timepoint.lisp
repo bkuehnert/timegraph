@@ -205,10 +205,18 @@
 	((not t2)
 	 (list t1 t1))
 
+	((tp-before-p t1 t2)
+	  (tp-assert-equal-helper tg t1 t2)
+	  (list t1 t1))
+
+	((tp-before-p t2 t1)
+	 (tp-assert-equal-helper tg t2 t1)
+	 (list t2 t2))
+
 	(t
 	  (tp-assert-before t1 t2)
 	  (tp-assert-equal-helper tg t1 t2)
-	  (list t1 t2))))
+	  (list t1 t1))))
 
 ;;; In the case that t1 and t2 exist and t2 is after t1, then in order
 ;;; to assert tat t1 = t2, all timepoints between t2 and t1 must be
@@ -218,30 +226,65 @@
 (defun tp-assert-equal-helper (tg t1 t2)
   (let* ((t1suc (get-all-successors t1))
 		 (t2anc (get-all-ancestors t2))
-		 (quo (intersection t1suc t2anc)))
-	(dolist (tk quo)
-	  (when (tp-prev tk)
-		(setf (tp-inc t1) (adjoin (tp-prev tk) (tp-inc t1)))
-		(setf (tp-out (tp-prev tk)) (adjoin tk (tp-out (tp-prev tk))))
-		(setf (tp-next (tp-prev tk)) nil))
-	  (when (tp-next tk)
-		(setf (tp-inc t1) (adjoin (tp-prev tk) (tp-inc t1)))
-		(setf (tp-out (tp-prev tk)) (adjoin tk (tp-out (tp-prev tk))))
-		(setf (tp-prev (tp-next tk)) nil))
+		 (quo (remove t1 (intersection t1suc t2anc))))
+	(when (member (tp-next t1) quo) 
+	  (setf (tp-next t1) nil))
 
-	  (setf (tp-inc t1) (union (tp-inc t1)
-				   (remove-if (lambda (x) (member x quo))
-						    (tp-inc tk))))
-	  (setf (tp-out t1) (union (tp-out t1)
-				   (remove-if (lambda (x) (member x quo))
-						    (tp-out tk))))
+	;(inspect quo)
+
+	(setf (tp-inc t1) (remove-if (lambda (x) (member x quo)) (tp-inc t1)))
+	(setf (tp-out t1) (remove-if (lambda (x) (member x quo)) (tp-out t1)))
+
+	(dolist (tk quo)
+	  (let ((tk-inc (remove-if (lambda (x) (member x (cons t1 quo)))
+							   (tp-inc tk)))
+			(tk-out (remove-if (lambda (x) (member x (cons t1 quo))) 
+							   (tp-out tk))))
+
+		(when (and (tp-prev tk) (not (member (tp-prev tk) (cons t1 quo))))
+		  (setf (tp-next (tp-prev tk)) nil)
+		  (tp-add-out-edge (tp-prev tk) t1)
+		  (tp-add-inc-edge t1 (tp-prev tk)))
+		
+		(when (and (tp-next tk) (not (member (tp-next tk) (cons t1 quo))))
+		  (setf (tp-prev (tp-next tk)) nil)
+		  (tp-add-inc-edge (tp-next tk) t1)
+		  (tp-add-out-edge t1 (tp-next tk)))
+
+		(dolist (tj tk-inc)
+		  (setf (tp-out tj) (remove tk (tp-out tj)))
+		  (tp-add-out-edge tj t1)
+		  (tp-add-inc-edge t1 tj))
+
+		(dolist (tj tk-out)
+		  (setf (tp-inc tj) (remove tk (tp-inc tj)))
+		  (tp-add-inc-edge tj t1)
+		  (tp-add-out-edge t1 tj)))
+
+
 
 	  (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
 	  (setf (tp-erefs t1) (union (tp-erefs t1) (tp-erefs tk)))
+
 	  (dolist (bref (tp-brefs tk))
 		(set-str tg bref t1))
 	  (dolist (eref (tp-erefs tk))
-		(set-end tg eref t1)))))
+		(set-end tg eref t1))))
+
+  (setf (tp-inc t1) (union (tp-inc t1) (tp-inc t2)))
+  (setf (tp-out t1) (union (tp-out t1) (tp-out t2)))
+  (if (tp-next t2)
+	(tp-assert-before t1 (tp-next t2))))
+
+
+(defun tp-add-out-edge (t1 t2)
+  (when (and t1 t2 (not (equal (tp-next t1) t2)))
+	(pushnew t2 (tp-out t1))))
+
+(defun tp-add-inc-edge (t1 t2)
+  (when (and t1 t2 (not (equal (tp-prev t1) t2)))
+	(pushnew t2 (tp-inc t1))))
+
 
 ;;; Querying functions
 ;;; ----------------------------------------------------------------------

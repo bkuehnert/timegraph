@@ -87,11 +87,11 @@
 		  (set-str tg e1 t1)
 		  (set-end tg e1 t2)
 		  (set-str tg e2 t3)
-		  (set-end tg e2 t4)
-		  (setf (tp-brefs t1) (adjoin e1 (tp-brefs t1)))
-		  (setf (tp-erefs t2) (adjoin e1 (tp-brefs t2)))
-		  (setf (tp-brefs t3) (adjoin e2 (tp-brefs t3)))
-		  (setf (tp-erefs t4) (adjoin e2 (tp-brefs t4))))))
+		  (set-end tg e2 t4) 
+		  (pushnew e1 (tp-brefs t1))
+		  (pushnew e1 (tp-erefs t2))
+		  (pushnew e2 (tp-brefs t3))
+		  (pushnew e2 (tp-erefs t4)))))
 
 	  (eval 
 		`(lambda (tg e1 e2)
@@ -119,8 +119,11 @@
 					(gethash (third con) *trans*))))
 				  conditions))))))))
 
+
+;;; TESTING CHANGE
+;(create-ep-constraint "EQUALS" `((1 t1 t2) (0 t1 t3)))
 (create-ep-constraint "EQUALS" `((1 t1 t2) (0 t1 t3) (0 t2 t4)))
-(create-ep-constraint "BEFORE" `((1 t1 t2) (1 t3 t4) (1 t1 t3)))
+(create-ep-constraint "BEFORE" `((1 t1 t3) (1 t1 t2) (1 t3 t4)))
 (create-ep-constraint "AFTER" `((1 t1 t2) (1 t3 t4) (1 t3 t1)))
 (create-ep-constraint "CONSEC" `((1 t1 t2) (1 t3 t4) (0 t2 t3)))
 (create-ep-constraint "AT-ABOUT" `((1 t1 t2) (1 t3 t4) (1 t3 t1) (1 t2 t4)))
@@ -238,3 +241,39 @@
 ;	  (set-lower-duration tg t1 t2 (- l2 u1)))
 ;	(if (or (not u) (and u2 l1 (> u (- u2 l1))))
 ;	  (set-upper-duration tg t1 t2 (- u2 l1)))))
+
+; Printing Functions
+; -------------------------------------------------------------------------
+
+; prints tg to a graphviz format
+(defun print-tg (tg) 
+  (let ((seen (make-hash-table :test #'equal))
+		(timepoints nil))
+
+	(format t "digraph T {~%node [shape=record]~%")
+
+	(maphash (lambda (key value) 
+			   (when (not (gethash value seen))
+				 (setf (gethash value seen) t)
+				 (push value timepoints)))
+			 (tg-str tg))
+	(maphash (lambda (key value) 
+			   (when (not (gethash value seen))
+				 (setf (gethash value seen) t)
+				 (push value timepoints)))
+			 (tg-end tg))
+
+	(dolist (tp timepoints)
+	  (format t "~A [label=\"ptime: ~A\\lbegins: ~A\\lends: ~A\\l\"]~%" 
+			  (sxhash tp) (tp-ptime tp) (tp-brefs tp) (tp-erefs tp)))
+
+	(dolist (tp timepoints)
+	  (when (tp-next tp)
+		(format t "~A -> ~A [color=\"blue\"]~%" (sxhash tp) (sxhash (tp-next tp))))
+	  (when (tp-out tp)
+		(dolist (out (tp-out tp))
+		  (format t "~A -> ~A~%" (sxhash tp) (sxhash out)))))
+
+	(format t "}")
+
+	))
