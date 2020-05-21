@@ -140,11 +140,43 @@
   (not (tp-prev t1)))
 
 ;;; For two existing timepoints t1 and t2, establish a cross-chain link t1 -> t2.
-(defun add-cross-link (t1 t2 )
+(defun add-cross-link (t1 t2)
   (when (and t1 t2)
     (let ((newlink (make-link :src t1 :dst t2)))
-      (push newlink (tp-out t1))
-      (push newlink (tp-inc t2)))))
+      (pushnew newlink (tp-out t1))
+      (pushnew newlink (tp-inc t2))
+      (update-link-bound newlink))))
+
+(defun update-link-bound (lk)
+  (let ((t1 (link-src lk))
+	(t2 (link-src lk)))
+
+    (when (and t1 t2)
+      (cond
+	((and (tp-lower t1) (tp-lower t2))
+	 (setf (tp-lower t2) (max (tp-lower t1) (tp-lower t2))))
+	((tp-lower t1)
+	 (setf (tp-lower t2) (tp-lower t1))))
+
+      (cond
+	((and (tp-upper t2) (tp-upper t1))
+	 (setf (tp-upper t1) (min (tp-upper t2) (tp-upper t1))))
+	((tp-upper t2)
+	 (setf (tp-upper t1) (tp-upper t2))))
+
+     (when (and (tp-lower t1) (tp-upper t2))
+       (if (link-upper lk)
+	   (setf (link-upper lk) (min (link-upper lk)
+				      (- (tp-upper t2) (tp-lower t1))))
+	   (setf (link-upper lk) (- (tp-upper l2) (tp-lower t1)))))
+
+     (when (and (tp-upper t1) (tp-lower t2))
+       (if (link-lower lk)
+	   (setf (link-lower lk) (max (link-lower lk)
+				      (- (tp-lower t2) (tp-upper t1))))
+	   (setf (link-lower lk) (- (tp-lower l2) (tp-upper t1))))))))
+
+    
 
 ;;; Insertion methods
 ;;; -----------------------------------------------------------------------
@@ -165,7 +197,8 @@
 		  :erefs erefs))
        (let ((newlink (make-link :chain (tp-chain t1) :src t1 :dst ret)))
 	 (setf (tp-prev ret) newlink)
-	 (setf (tp-next t1) newlink))
+	 (setf (tp-next t1) newlink)
+	 (update-link-bound newlink)) ;note: possibly useless
 
        ret)
 
@@ -190,7 +223,8 @@
 		  :erefs erefs))
        (let ((newlink (make-link :chain (tp-chain t1) :src ret :dst t1)))
 	 (setf (tp-next ret) newlink)
-	 (setf (tp-prev t1) newlink))
+	 (setf (tp-prev t1) newlink)
+	 (update-link-bound newlink)) ;note: last line here is possibly useless
 
        ret)
 	 
@@ -223,7 +257,8 @@
     ((and (last-p t1) (first-p t2))
      (let ((newlink (make-link :chain (tp-chain t1) :src t1 :dst t2)))
        (setf (tp-next t1) newlink)
-       (setf (tp-prev t2) newlink))
+       (setf (tp-prev t2) newlink)
+       (update-link-bound newlink))
      (funcall
       (alambda (tk ptime hash)
 	(when tk
@@ -282,50 +317,54 @@
     (when (member (tp-next t1) quo) 
       (setf (tp-next t1) nil))
 
-    (setf (tp-inc t1) (remove-if (lambda (x) (member x quo)) (tp-inc t1)))
+    (setf (tp-inc t1) (mapcar (lambda (y) (make-link :src y :dst t1))
+			      (remove-if (lambda (x) (member x quo)) (tp-inc t1))))
 
-    (setf (tp-out t1) (remove-if (lambda (x) (member x quo)) (tp-out t1)))
+    (setf (tp-out t1) (mapcar (lambda (y) (make-link :src t1 :dst y))
+			      (remove-if (lambda (x) (member x quo)) (tp-out t1))))
 
-	(dolist (tk quo)
-	  (let ((tk-inc (remove-if (lambda (x) (member x (cons t1 quo)))
-							   (tp-inc tk)))
-			(tk-out (remove-if (lambda (x) (member x (cons t1 quo))) 
-							   (tp-out tk))))
+    ;;move through timepoints between t1 and t2 and redirect all of their edges through
+    ;;to t1
+    (dolist (tk quo)
+      (let ((tk-inc (remove-if (lambda (x) (member x (cons t1 quo))) (tp-inc tk)))
+	    (tk-out (remove-if (lambda (x) (member x (cons t1 quo))) (tp-out tk))))
 
-		(when (and (tp-prev tk) (not (member (tp-prev tk) (cons t1 quo))))
-		  (setf (tp-next (tp-prev tk)) nil)
-		  (tp-add-out-edge (tp-prev tk) t1)
-		  (tp-add-inc-edge t1 (tp-prev tk)))
+	(when (and (tp-prev tk) (not (member (tp-prev tk) (cons t1 quo))))
+	  (setf (tp-next (tp-prev tk)) nil)
+	  (add-cross-link (tp-prev tk) t1))
 		
-		(when (and (tp-next tk) (not (member (tp-next tk) (cons t1 quo))))
-		  (setf (tp-prev (tp-next tk)) nil)
-		  (tp-add-inc-edge (tp-next tk) t1)
-		  (tp-add-out-edge t1 (tp-next tk)))
+	(when (and (tp-next tk) (not (member (tp-next tk) (cons t1 quo))))
+	  (setf (tp-prev (tp-next tk)) nil)
+	  (add-cross-link t1 (tp-next tk)))
 
-		(dolist (tj tk-inc)
-		  (setf (tp-out tj) (remove tk (tp-out tj)))
-		  (tp-add-out-edge tj t1)
-		  (tp-add-inc-edge t1 tj))
+	(dolist (tj tk-inc)
+	  (setf (tp-out tj) (remove tk (tp-out tj)))
+	  (add-cross-link tj t1))
 
-		(dolist (tj tk-out)
-		  (setf (tp-inc tj) (remove tk (tp-inc tj)))
-		  (tp-add-inc-edge tj t1)
-		  (tp-add-out-edge t1 tj)))
+	(dolist (tj tk-out)
+	  (setf (tp-inc tj) (remove tk (tp-inc tj)))
+	  (add-cross-link t1 tj))
+
+      (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
+      (setf (tp-erefs t1) (union (tp-erefs t1) (tp-erefs tk)))
+
+      (dolist (bref (tp-brefs tk))
+	(set-str tg bref t1))
+      (dolist (eref (tp-erefs tk))
+	(set-end tg eref t1))))
+
+  (if (tp-lower t2)
+      (if (tp-lower t1)
+	  (setf (tp-lower t1) (max (tp-lower t1) (tp-lower t2)))
+	  (setf (tp-lower t1) (tp-lower t2))))
+  (if (tp-uppwer t2)
+      (if (tp-upper t1)
+	  (setf (tp-upper t1) (min (tp-upper t1) (tp-upper t2)))
+	  (setf (tp-upper t1) (tp-upper t2))))
 
 
-
-	  (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
-	  (setf (tp-erefs t1) (union (tp-erefs t1) (tp-erefs tk)))
-
-	  (dolist (bref (tp-brefs tk))
-		(set-str tg bref t1))
-	  (dolist (eref (tp-erefs tk))
-		(set-end tg eref t1))))
-
-  (setf (tp-inc t1) (union (tp-inc t1) (tp-inc t2)))
-  (setf (tp-out t1) (union (tp-out t1) (tp-out t2)))
-  (if (tp-next t2)
-	(tp-assert-before t1 (tp-next t2))))
+  ;;next, call method that propogates bounds from t1
+  ))
 
 
 (defun tp-add-out-edge (t1 t2)
