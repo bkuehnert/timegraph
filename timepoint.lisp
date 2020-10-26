@@ -120,11 +120,11 @@
 
 ;;; For two existing timepoints t1 and t2, establish a cross-chain link t1 -> t2.
 (defun add-cross-link (t1 t2)
-  (when (and t1 t2)
-    (let ((newlink (make-link :src t1 :dst t2)))
-      (pushnew newlink (tp-out t1))
-      (pushnew newlink (tp-inc t2))
-      (update-link-bound newlink))))
+  (let ((newlink (make-link :src t1 :dst t2)))
+    (unless (or (or (not t1) (not t2))
+                (some (lambda (link) (eq t2 (link-dst link))) (tp-out t1)))
+      (push newlink (tp-out t1))
+      (push newlink (tp-inc t2)))))
 
 ;; Update absolute bounds. Currently does nothing.
 (defun update-link-bound (lk)
@@ -232,7 +232,7 @@
        (setf (tp-next t1) new-link)
        (setf (tp-prev t2) new-link)
        (update-link-bound new-link)
-       (update-chain t2 (tp-ptime t1) (tp-chain t1))
+       (update-chain t2 (tp-chain t1) (tp-ptime t1))
        (list t1 t2)))
     (t
      (add-cross-link t1 t2)
@@ -310,12 +310,10 @@
         (setf (tp-next tk) nil))
 
       (dolist (in-link (tp-inc tk))
-        (setf (link-dst in-link) t1)
-        (pushnew in-link (tp-inc t1)))
+        (add-cross-link (link-src in-link) tk))
 
       (dolist (out-link (tp-out tk))
-        (setf (link-src out-link) t1)
-        (pushnew out-link (tp-out t1)))
+        (add-cross-link (link-dst out-link) tk))
 
       ;; Update the beginning and end refs of t1 to include all deleted timepoints.
       (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
