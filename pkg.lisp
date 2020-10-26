@@ -7,6 +7,7 @@
    #:assert-prop
    #:eval-prop
    #:make-timegraph
+   #:print-tg
    #:*tg*
 
    ;; Relation symbols to export
