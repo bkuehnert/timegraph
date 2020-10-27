@@ -215,7 +215,8 @@
 ;;; then it must be the case that t2 is not before t1, otherwise, the
 ;;; timegraph will be in a contradictory state after running this
 ;;; function.
-(defun tp-assert-before (t1 t2)
+(defun tp-assert-before (tg t1 t2)
+  (declare (ignore tg))
   (cond
     ((and (not t1) (not t2))
      (let* ((t1 (make-timepoint))
@@ -266,7 +267,7 @@
      (list t2 t2))
 
     (t
-     (tp-assert-before t1 t2)
+     (tp-assert-before nil t1 t2)
      (tp-assert-equal-helper tg t1 t2)
      (list t1 t1))))
 
@@ -310,10 +311,18 @@
         (setf (tp-next tk) nil))
 
       (dolist (in-link (tp-inc tk))
+        (setf (tp-out (link-src in-link))
+              (delete-if (lambda (link) (equal (link-dst link) tk))
+                         (tp-out (link-src in-link))))
         (add-cross-link (link-src in-link) tk))
+      (setf (tp-inc tk) nil)
 
       (dolist (out-link (tp-out tk))
+        (setf (tp-inc (link-dst out-link))
+              (delete-if (lambda (link) (equal (link-src link) tk))
+                         (tp-inc (link-dst out-link))))
         (add-cross-link (link-dst out-link) tk))
+      (setf (tp-out tk) nil)
 
       ;; Update the beginning and end refs of t1 to include all deleted timepoints.
       (setf (tp-brefs t1) (union (tp-brefs t1) (tp-brefs tk)))
@@ -328,8 +337,8 @@
 
     ;; Clean up orphaned links. Any link from quo -> quo is now a self-loop on t1. Those
     ;; should be removed from the list of links and garbage collected.
-    (delete-if (lambda (link) (equal (link-src link) (link-dst link))) (tp-inc t1))
-    (delete-if (lambda (link) (equal (link-src link) (link-dst link))) (tp-out t1))))
+    (setf (tp-inc t1) (delete-if (lambda (link) (equal (link-src link) (link-dst link))) (tp-inc t1)))
+    (setf (tp-out t1) (delete-if (lambda (link) (equal (link-src link) (link-dst link))) (tp-out t1)))))
 
 ;;; Querying functions
 ;;; ----------------------------------------------------------------------
