@@ -34,37 +34,35 @@
               (eval (create-rel-eval conditions))
               (eval (create-rel-eval-neg conditions)))))
 
+(defun create-rel-assert-help (con tg e1 e2)
+  `(let* ((e1.start (get-beg ,tg ,e1))
+          (e2.start (get-end ,tg ,e1))
+          (e1.end (get-beg ,tg ,e2))
+          (e2.end (get-end ,tg ,e2))
+          (pair (,(if (equal (first con) '=) 'tp-assert-equals 'tp-assert-before)
+                  ,tg ,(second con) ,(third con)))
+          (,(second con) (first pair))
+          (,(third con) (second pair)))
+     (when e1.start
+       (set-beg ,tg ,e1 e1.start)
+       (pushnew ,e1 (tp-brefs e1.start)))
+     (when e1.end
+       (set-end ,tg ,e1 e1.end)
+       (pushnew ,e1 (tp-erefs e1.end)))
+     (when e2.start
+       (set-beg ,tg ,e2 e2.start)
+       (pushnew ,e2 (tp-brefs e2.start)))
+     (when e2.end
+       (set-end ,tg ,e2 e2.end)
+       (pushnew ,e2 (tp-erefs e2.end)))))
+
 (defun create-rel-assert (conditions)
   (let ((e1 (gensym "E1"))
         (e2 (gensym "E2"))
         (tg (gensym "TG")))
-  `(lambda (,tg ,e1 ,e2)
-     (let* ((e1.start (get-beg ,tg ,e1))
-            (e2.start (get-end ,tg ,e1))
-            (e1.end (get-beg ,tg ,e2))
-            (e2.end (get-end ,tg ,e2))
-            ,@(apply #'append
-                     (mapcar
-                      (lambda (con)
-                        `(,(cond
-                             ((equal (first con) '=)
-                              `(pair (tp-assert-equals ,tg ,(second con) ,(third con))))
-                             ((equal (first con) '<)
-                              `(pair (tp-assert-before ,(second con) ,(third con)))))
-                           (,(second con) (first pair))
-                           (,(third con) (second pair))))
-                      conditions)))
-       ;; This is probably unnecessary, since all of the timepoint update functions will
-       ;; update the references against the timegraph which is passed in.
-       ;; TODO: Experiment with removing this.
-       (set-beg ,tg ,e1 e1.start)
-       (set-end ,tg ,e1 e1.end)
-       (set-beg ,tg ,e2 e2.start)
-       (set-end ,tg ,e2 e2.end) 
-       (pushnew ,e1 (tp-brefs e1.start))
-       (pushnew ,e1 (tp-erefs e1.end))
-       (pushnew ,e2 (tp-brefs e2.start))
-       (pushnew ,e2 (tp-erefs e2.end))))))
+    `(lambda (,tg ,e1 ,e2)
+       ,@(mapcar (lambda (con) (create-rel-assert-help con tg e1 e2))
+                 conditions))))
 
 (defun create-rel-eval (conditions)
   (let ((e1 (gensym "E1"))
@@ -102,7 +100,8 @@
 
 ;; Add some typical relations
 (create-ep-relation 'equals '((< e1.start e1.end) (= e1.start e2.start) (= e1.end e2.end)))
-(create-ep-relation 'before '((< e1.start e2.start) (< e1.start e1.end) (< e2.start e2.end)))
+(create-ep-relation 'before '((< e1.start e2.start) (< e1.start e1.end))); (< e2.start e2.end)))
+(create-ep-relation 'fuck '((< e1.start e2.end) (< e1.start e2.end))); (< e2.start e2.end)))
 (create-ep-relation 'after '((< e1.start e1.end) (< e2.start e2.end) (< e2.start e1.start)))
 (create-ep-relation 'consec '((< e1.start e1.end) (= e1.end e2.start) (< e2.start e2.end)))
 (create-ep-relation 'at-about '((< e1.start e1.end) (< e2.start e2.end) (< e2.start e1.start) (< e1.end e2.end)))
