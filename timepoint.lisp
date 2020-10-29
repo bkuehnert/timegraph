@@ -273,11 +273,12 @@
      (tp-assert-equal-helper tg t1 t2)
      (list t1 t1))))
 
-;;; In the case that t1 and t2 exist and t2 is after t1, then in order
-;;; to assert that t1 = t2, all timepoints between t2 and t1 must be
-;;; set equal to eachother (and thus equal to t1). This helper function
-;;; searches for such points and updates their references with a given
-;;; timegraph object tg.
+;; In the case that t1 and t2 exist and t2 is after t1, then in order
+;; to assert that t1 = t2, all timepoints between t2 and t1 must be
+;; set equal to eachother (and thus equal to t1). This helper function
+;; searches for such points and updates their references with a given
+;; timegraph object tg.
+;; TODO: re-implement this recursively.
 (defun tp-assert-equal-helper (tg t1 t2)
   (let* ((t1suc (get-all-successors t1))
          (t2anc (get-all-ancestors t2))
