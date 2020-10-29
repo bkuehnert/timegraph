@@ -122,7 +122,8 @@
 (defun add-cross-link (t1 t2)
   (let ((newlink (make-link :src t1 :dst t2)))
     (unless (or (or (not t1) (not t2))
-                (some (lambda (link) (eq t2 (link-dst link))) (tp-out t1)))
+                (some (lambda (link) (eq t2 (link-dst link))) (tp-out t1))
+                (equal (link-dst (tp-next t1)) t2))
       (push newlink (tp-out t1))
       (push newlink (tp-inc t2)))))
 
@@ -216,7 +217,6 @@
 ;;; timegraph will be in a contradictory state after running this
 ;;; function.
 (defun tp-assert-before (tg t1 t2)
-  (declare (ignore tg))
   (cond
     ((and (not t1) (not t2))
      (let* ((t1 (make-timepoint))
@@ -228,6 +228,8 @@
      (list t1 (insert-timepoint-after t1)))
     ((tp-before-p t1 t2)
      (list t1 t2))
+    ((tp-before-p t2 t1)
+     (tp-assert-equal tg t2 t1))
     ((and (last-p t1) (first-p t2))
      (let ((new-link (make-link :src t1 :dst t2)))
        (setf (tp-next t1) new-link)
@@ -243,9 +245,9 @@
 ;;; equal to t2 and return (t1 t2). Preconditions: none. Function also
 ;;; requires reference to a timegraph tg, since updates to the timegraph's
 ;;; references are needed in some cases.
-(defun tp-assert-equals (tg t1 t2)
+(defun tp-assert-equal (tg t1 t2)
   (cond 
-    ((tp-equals-p t1 t2)
+    ((tp-equal-p t1 t2)
      (list t1 t2))
 
     ((and (not t1) (not t2))
@@ -306,22 +308,23 @@
 
       ;; Update outgoing chain, with exception to t2. This timepoint is handled
       ;; specially, as t2's chain is broken by this procedure.
-      (unless (equal tk t2)
-        (add-cross-link t1 (link-dst (tp-next tk)))
-        (setf (tp-next tk) nil))
+      ;; Note: What is happening here?
+      ; (unless (equal tk t2)
+      ;  (add-cross-link t1 (link-dst (tp-next tk)))
+      ;  (setf (tp-next tk) nil))
 
       (dolist (in-link (tp-inc tk))
         (setf (tp-out (link-src in-link))
               (delete-if (lambda (link) (equal (link-dst link) tk))
                          (tp-out (link-src in-link))))
-        (add-cross-link (link-src in-link) tk))
+        (add-cross-link (link-src in-link) t1))
       (setf (tp-inc tk) nil)
 
       (dolist (out-link (tp-out tk))
         (setf (tp-inc (link-dst out-link))
               (delete-if (lambda (link) (equal (link-src link) tk))
                          (tp-inc (link-dst out-link))))
-        (add-cross-link (link-dst out-link) tk))
+        (add-cross-link t1 (link-dst out-link)))
       (setf (tp-out tk) nil)
 
       ;; Update the beginning and end refs of t1 to include all deleted timepoints.
@@ -362,24 +365,10 @@
                       (return-from tp-before-p t)))))))
           (dfs t1)))))
 
-;;; Returns t if and only if the timegraph contains evidence that t1 is 
-;;; not before t2.
-(defun tp-not-before-p (t1 t2) 
-  (and (not (equal t1 t2))
-       (tp-before-p t2 t1)))
-
 ;;; Returns t if t1 is equal to t2. Returns nil if the inference cannot be
 ;;; made.
-(defun tp-equals-p (t1 t2)
-  (and (or (not t1) (not t2))
-       (equal t1 t2)))
-
-;;; Returns t if the inference that t1 is not equal to t2 can be made. 
-;;; Note: due to the strength of timegraph, this inference can never be
-;;; made.
-(defun tp-not-equals-p (t1 t2)
-  (declare (ignore t1 t2))
-  nil)
+(defun tp-equal-p (t1 t2)
+  (equal t1 t2))
 
 ;;; For two timepoints t1 and t2, compute the relation (if one exists)
 ;;; between the two timepoints. Possible return values are:
