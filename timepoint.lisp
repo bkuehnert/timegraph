@@ -123,7 +123,7 @@
   (let ((newlink (make-link :src t1 :dst t2)))
     (unless (or (or (not t1) (not t2))
                 (some (lambda (link) (eq t2 (link-dst link))) (tp-out t1))
-                (equal (link-dst (tp-next t1)) t2))
+                (and (tp-next t1) (equal (link-dst (tp-next t1)) t2)))
       (push newlink (tp-out t1))
       (push newlink (tp-inc t2)))))
 
@@ -293,9 +293,8 @@
       ;; Update incoming chain
       (when (tp-prev tk)
         (let ((tk-prev (link-src (tp-prev tk))))
-          ;; only need to do this if previous is not in quo.
-          ;; garbage collection should take care of this otherwise.
-          (add-cross-link tk-prev t1)
+          (unless (member tk-prev quo)
+            (add-cross-link tk-prev t1))
           (setf (tp-prev tk) nil)
           (setf (tp-next tk-prev) nil)))
 
@@ -306,13 +305,6 @@
             (update-chain tk-next (sxhash (gensym)) 0))
           (setf (tp-next tk) nil)
           (setf (tp-prev tk-next) nil)))
-
-      ;; Update outgoing chain, with exception to t2. This timepoint is handled
-      ;; specially, as t2's chain is broken by this procedure.
-      ;; Note: What is happening here?
-      ; (unless (equal tk t2)
-      ;  (add-cross-link t1 (link-dst (tp-next tk)))
-      ;  (setf (tp-next tk) nil))
 
       (dolist (in-link (tp-inc tk))
         (setf (tp-out (link-src in-link))
