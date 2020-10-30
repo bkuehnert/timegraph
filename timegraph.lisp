@@ -38,7 +38,7 @@
 (defun time-prop-p (prop)
   (and 
    (listp prop)
-   (member (second prop '(:equal :before :after :precond :postcond :consec :during)))
+   (member (second prop) '(:equal :before :after :precond :postcond :consec :during))
    (equal (list-length prop) 3)
    t)) ; t here so that we return a boolean.
 
