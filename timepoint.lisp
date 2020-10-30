@@ -7,8 +7,6 @@
 ;;; * ptime: Pseudotime of a timepoint.
 ;;; * inc: List of cross-chain links entering the timepoint.
 ;;; * out: List of cross-chain links exiting the timepoint.
-;;; * upper: Numerical absolute upper bound on the timepoint.
-;;; * lower: Numerical absolute lower bound on the timepoint.
 ;;; * brefs: List of episode names which the timepoint begins.
 ;;; * erefs: List of episode names which the timepoint ends.
 (defclass timepoint ()
@@ -45,12 +43,13 @@
           :accessor tp-erefs
           :initform ())))
 
-;; TODO: use structs so that we don't need this mess. 
 (defun make-timepoint (&key (chain (sxhash (gensym))) prev next (ptime 0)
                          (inc ()) (out ()) (brefs ()) (erefs ()))
   (make-instance 'timepoint :chain chain :prev prev :next next :ptime ptime
                  :inc inc :out out :brefs brefs :erefs erefs))
 
+;; Represents a link between two timepoints. In the future, this will store
+;; absolute temporal bounds.
 (defclass link ()
   ((src :type timepoint
         :accessor link-src
@@ -127,41 +126,6 @@
       (push newlink (tp-out t1))
       (push newlink (tp-inc t2)))))
 
-;; Update absolute bounds. Currently does nothing.
-(defun update-link-bound (lk)
-  (declare (ignore lk))
-  nil
-;  (let ((t1 (link-src lk))
-;       (t2 (link-src lk)))
-;
-;    (when (and t1 t2)
-;      (cond
-;       ((and (tp-lower t1) (tp-lower t2))
-;        (setf (tp-lower t2) (max (tp-lower t1) (tp-lower t2))))
-;       ((tp-lower t1)
-;        (setf (tp-lower t2) (tp-lower t1))))
-;
-;      (cond
-;       ((and (tp-upper t2) (tp-upper t1))
-;        (setf (tp-upper t1) (min (tp-upper t2) (tp-upper t1))))
-;       ((tp-upper t2)
-;        (setf (tp-upper t1) (tp-upper t2))))
-;
-;     (when (and (tp-lower t1) (tp-upper t2))
-;       (if (link-upper lk)
-;          (setf (link-upper lk) (min (link-upper lk)
-;                                     (- (tp-upper t2) (tp-lower t1))))
-;          (setf (link-upper lk) (- (tp-upper l2) (tp-lower t1)))))
-;
-;     (when (and (tp-upper t1) (tp-lower t2))
-;       (if (link-lower lk)
-;          (setf (link-lower lk) (max (link-lower lk)
-;                                     (- (tp-lower t2) (tp-upper t1))))
-;          (setf (link-lower lk) (- (tp-lower l2) (tp-upper t1)))))))
-  )
-
-
-
 ;;; Insertion methods
 ;;; -----------------------------------------------------------------------
 
@@ -180,7 +144,6 @@
             (newlink (make-link :src t1 :dst ret)))
        (setf (tp-prev ret) newlink)
        (setf (tp-next t1) newlink)
-       ;;(update-link-bound newlink)) ;note: possibly useless
        ret))
     (t
      (let ((ret (make-timepoint :brefs brefs :erefs erefs)))
@@ -202,9 +165,7 @@
                   :erefs erefs))
        (let ((newlink (make-link :src ret :dst t1)))
          (setf (tp-next ret) newlink)
-         (setf (tp-prev t1) newlink)
-         (update-link-bound newlink)) ;note: last line here is possibly useless
-
+         (setf (tp-prev t1) newlink))
        ret)
       (t
        (setf ret (make-timepoint :brefs brefs :erefs erefs))
@@ -234,7 +195,6 @@
      (let ((new-link (make-link :src t1 :dst t2)))
        (setf (tp-next t1) new-link)
        (setf (tp-prev t2) new-link)
-       (update-link-bound new-link)
        (update-chain t2 (tp-chain t1) (tp-ptime t1))
        (list t1 t2)))
     (t
@@ -363,75 +323,3 @@
 (defun tp-equal-p (t1 t2)
   (equal t1 t2))
 
-;;; For two timepoints t1 and t2, compute the relation (if one exists)
-;;; between the two timepoints. Possible return values are:
-;;;     - nil : no relation found
-;;;     - 1   : t1 before or equals t2
-;;;     - 2   : t1 after or equals t2 
-;;;     - 3   : t1 equal to t2
-
-(defun get-relation (t1 t2)
-  (cond
-    ((or (not t1) (not t2)) nil)
-    ((and (equal (tp-chain t1) (tp-chain t2)) 
-          (< (tp-ptime t1) (tp-ptime t2))) 1)
-    ((and (equal (tp-chain t1) (tp-chain t2)) 
-          (> (tp-ptime t1) (tp-ptime t2))) 2)
-    ((equal t1 t2) 3)
-    ((tp-before-p t1 t2) 1)
-    ((tp-before-p t2 t1) 2)
-    (t nil)))
-
-
-;;; Quantitative bounds (needs some work)
-;;; ----------------------------------------------------------------------
-
-                                        ;(defun insert-lower-bound (t1 bound)
-                                        ;  (progn
-                                        ;       (setf (tp-lower t1) bound)
-                                        ;       (prop-lower-bound t1)))
-                                        ;
-                                        ;(defun insert-upper-bound (t1 bound)
-                                        ;  (progn
-                                        ;       (setf (tp-upper t1) bound)
-                                        ;       (prop-upper-bound t1)))
-                                        ;
-;;;; Propogate lower bound
-                                        ;(defun prop-lower-bound (t1)
-                                        ;  (dolist (tk (get-successors t1))
-                                        ;       (prop-bound-down tk  (tp-lower t1))))
-                                        ;
-;;;; Propogate upper bound
-                                        ;(defun prop-upper-bound (t1)
-                                        ;  (dolist (tk (get-ancestors t1))
-                                        ;       (prop-bound-up tk (tp-upper t1))))
-                                        ;
-                                        ;(defun prop-bounds (t1)
-                                        ;  (progn
-                                        ;       (prop-upper-bound t1)
-                                        ;       (prop-lower-bound t1)))
-                                        ;
-;;; Propogate timebounds up
-                                        ;(defun prop-bound-down (t1 bound)
-                                        ;  (cond 
-                                        ;       ((not t1) nil)
-                                        ;       ((or (not (tp-lower t1)) (< (tp-lower t1) bound))
-                                        ;        (setf (tp-lower t1) bound)
-                                        ;        (dolist (tk (get-successors t1)) 
-                                        ;          (prop-bound-down tk bound)))))
-                                        ;
-;;;; Propogate timebounds down
-                                        ;(defun prop-bound-up (t1 bound)
-                                        ;  (cond
-                                        ;       ((not t1) nil)
-                                        ;       ((or (not (tp-upper t1)) (> (tp-upper t1) bound))
-                                        ;        (setf (tp-upper t1) bound)
-                                        ;        (dolist (tk (get-ancestors t1)) 
-                                        ;          (prop-bound-up tk bound)))))
-
-;;; testing functions
-;;; -----------------------------------------------------------------------
-
-(defun print-tp (tp)
-  (format t "prev: ~A~%next: ~A~%links: ~A"
-          (tp-prev tp) (tp-next tp) (tp-out tp)))
