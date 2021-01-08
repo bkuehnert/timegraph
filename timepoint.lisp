@@ -34,6 +34,14 @@
         :initarg :out
         :accessor tp-out
         :initform ())
+   (lower :type (or timestamp nil)
+          :initarg :lower
+          :accessor tp-lower
+          :initform nil)
+   (upper :type (or timestamp nil)
+          :initarg :upper
+          :accessor tp-upper
+          :initform nil)
    (brefs :type list
           :initarg :brefs
           :accessor tp-brefs
@@ -123,6 +131,8 @@
     (unless (or (or (not t1) (not t2))
                 (some (lambda (link) (eq t2 (link-dst link))) (tp-out t1))
                 (and (tp-next t1) (equal (link-dst (tp-next t1)) t2)))
+      (if (tp-lower t1) (update-lower t2 (tp-lower t1)))
+      (if (tp-upper t2) (update-upper t1 (tp-upper t2)))
       (push newlink (tp-out t1))
       (push newlink (tp-inc t2)))))
 
@@ -142,6 +152,7 @@
                   :brefs brefs
                   :erefs erefs))
             (newlink (make-link :src t1 :dst ret)))
+       (setf (tp-lower ret) (tp-lower t1))
        (setf (tp-prev ret) newlink)
        (setf (tp-next t1) newlink)
        ret))
@@ -164,6 +175,7 @@
                   :brefs brefs
                   :erefs erefs))
        (let ((newlink (make-link :src ret :dst t1)))
+         (setf (tp-upper ret) (tp-upper t1))
          (setf (tp-next ret) newlink)
          (setf (tp-prev t1) newlink))
        ret)
@@ -295,6 +307,27 @@
     ;; should be removed from the list of links and garbage collected.
     (setf (tp-inc t1) (delete-if (lambda (link) (equal (link-src link) (link-dst link))) (tp-inc t1)))
     (setf (tp-out t1) (delete-if (lambda (link) (equal (link-src link) (link-dst link))) (tp-out t1)))))
+
+;;; Quantitative bound functions
+;;; ----------------------------------------------------------------------
+
+;; For a timepoint tp, update its lower quantitative bound with a new timestamp.
+;; Note: if this timestamp constitutes a looser bound than the one already present,
+;; this function will do nothing.
+(defun update-lower (tp timestamp)
+  (if (or (not (tp-lower tp))
+          (localtime:timestamp<= (tp-lower tp) timestamp))
+      (setf (tp-lower tp) timestamp)
+      (dolist (tk (get-successors tp))
+        (update-lower tk timestamp))))
+
+;; Update upper quantitative bound. This has the same semantics as the above function
+(defun update-upper (tp timestamp)
+  (if (or (not (tp-upper tp))
+          (localtime:timestamp>= (tp-upper tp) timestamp))
+      (setf (tp-upper tp) timestamp)
+      (dolist (tk (get-ancestors tp))
+        (update-upper tk timestamp))))
 
 ;;; Querying functions
 ;;; ----------------------------------------------------------------------

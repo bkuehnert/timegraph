@@ -3,6 +3,7 @@
     :author "Ben Kuehnert"
     :license "MIT-style"
     :description "Lisp implementation of timegraph datastructure."
+    :depends-on (:local-time)
     :serial t
     :components
     ((:file "pkg")
