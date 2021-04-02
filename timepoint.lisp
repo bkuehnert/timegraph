@@ -207,6 +207,8 @@
      (let ((new-link (make-link :src t1 :dst t2)))
        (setf (tp-next t1) new-link)
        (setf (tp-prev t2) new-link)
+       (update-upper t1 (tp-upper t2))
+       (update-lower t2 (tp-lower t1))
        (update-chain t2 (tp-chain t1) (tp-ptime t1))
        (list t1 t2)))
     (t
@@ -316,7 +318,7 @@
 ;; this function will do nothing.
 (defun update-lower (tp timestamp)
   (if (or (not (tp-lower tp))
-          (localtime:timestamp<= (tp-lower tp) timestamp))
+          (local-time:timestamp<= (tp-lower tp) timestamp))
       (setf (tp-lower tp) timestamp)
       (dolist (tk (get-successors tp))
         (update-lower tk timestamp))))
@@ -324,7 +326,7 @@
 ;; Update upper quantitative bound. This has the same semantics as the above function
 (defun update-upper (tp timestamp)
   (if (or (not (tp-upper tp))
-          (localtime:timestamp>= (tp-upper tp) timestamp))
+          (local-time:timestamp>= (tp-upper tp) timestamp))
       (setf (tp-upper tp) timestamp)
       (dolist (tk (get-ancestors tp))
         (update-upper tk timestamp))))
@@ -336,20 +338,36 @@
 ;;; t2 or there is no relation found.
 ;;; todo: add shortcut if quant bounds allow it (with optional tg reference)
 (defun tp-before-p (t1 t2)
-  (if (or (not t1) (not t2))
-      nil
-      (let ((seen (make-hash-table :test #'equal)))
-        (labels
-            ((dfs (tk)
-               (cond
-                 ((and (equal (tp-chain tk) (tp-chain t2)))
-                  (<= (tp-ptime tk) (tp-ptime t2)))
-                 ((not (gethash tk seen))
-                  (setf (gethash tk seen) t)
-                  (dolist (next (get-successors tk))
-                    (when (dfs next)
-                      (return-from tp-before-p t)))))))
-          (dfs t1)))))
+  (when (and t1 t2)
+    (when (and (tp-upper t1) (tp-lower t2)
+               (local-time:timestamp<= (tp-upper t1) (tp-lower t2)))
+      (return-from tp-before-p t))
+    (let ((seen (make-hash-table :test #'equal)))
+      (labels
+          ((dfs (tk)
+             (cond
+               ((and (equal (tp-chain tk) (tp-chain t2)))
+                (<= (tp-ptime tk) (tp-ptime t2)))
+               ((not (gethash tk seen))
+                (setf (gethash tk seen) t)
+                (dolist (next (get-successors tk))
+                  (when (dfs next)
+                    (return-from tp-before-p t)))))))
+        (dfs t1)))))
+
+;; returns t if and only if there is evidence that t1 is strictly after t2.
+;; This can only be proven with quantitative bounds.
+(defun tp-not-before-p (t1 t2)
+  (and t1 t2 (tp-lower t1) (tp-upper t2)
+       (local-time:timestamp< (tp-upper t2) (tp-lower t1))))
+
+;; returns t if and only if there is evidence that t1 and t2 occur at
+;; different times. THis can only be done with quantitative bounds
+(defun tp-not-equal-p (t1 t2)
+  (or (and t1 t2 (tp-upper t1) (tp-lower t2)
+           (local-time:timestamp< (tp-upper t1) (tp-lower t2)))
+      (and t1 t2 (tp-upper t2) (tp-lower t1)
+           (local-time:timestamp< (tp-upper t2) (tp-lower t2)))))
 
 ;;; Returns t if t1 is equal to t2. Returns nil if the inference cannot be
 ;;; made.

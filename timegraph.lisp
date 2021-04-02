@@ -77,6 +77,11 @@
 ;; it working. So, this will have to do for now.
 
 (defun tg-assert-before (e1 e2 &optional (tg *tg*))
+  (when (or (tp-not-before-p (get-beg tg e1) (get-end tg e1))
+            (tp-not-before-p (get-beg tg e1) (get-beg tg e2))
+            (tp-not-before-p (get-beg tg e2) (get-end tg e2)))
+    (format t "~A before ~A is inconsistent in timegraph ~A" e1 e2 tg)
+    (return-from tg-assert-before  nil))
   (let* ((pair1 (tp-assert-before tg (get-beg tg e1) (get-end tg e1)))
          (pair2 (tp-assert-before tg (first pair1) (get-beg tg e2)))
          (pair3 (tp-assert-before tg (second pair2) (get-end tg e2))))
@@ -86,6 +91,11 @@
     (set-end tg e2 (second pair3))))
 
 (defun tg-assert-consec (e1 e2 &optional (tg *tg*))
+  (when (or (tp-not-before-p (get-beg tg e1) (get-end tg e1))
+            (tp-not-equal-p (get-end tg e1) (get-beg tg e2))
+            (tp-not-before-p (get-beg tg e2) (get-end tg e2)))
+    (format t "~A consec ~A is inconsistent in timegraph ~A" e1 e2 tg)
+    (return-from tg-assert-consec  nil))
   (let* ((pair1 (tp-assert-before tg (get-beg tg e1) (get-end tg e1)))
          (pair2 (tp-assert-equal tg (second pair1) (get-beg tg e2)))
          (pair3 (tp-assert-before tg (second pair2) (get-end tg e2))))
@@ -95,6 +105,10 @@
     (set-end tg e2 (second pair3))))
 
 (defun tg-assert-equal (e1 e2 &optional (tg *tg*))
+  (when (or (tp-not-equal-p (get-beg tg e1) (get-end tg e1))
+            (tp-not-equal-p (get-beg tg e2) (get-end tg e2)))
+    (format t "~A equal ~A is inconsistent in timegraph ~A" e1 e2 tg)
+    (return-from tg-assert-equal  nil))
   (let* ((pair1 (tp-assert-before tg (get-beg tg e1) (get-end tg e1)))
          (pair2 (tp-assert-equal tg (first pair1) (get-beg tg e2)))
          (pair3 (tp-assert-equal tg (second pair1) (get-end tg e2))))
@@ -104,6 +118,11 @@
     (set-end tg e2 (second pair3))))
 
 (defun tg-assert-precond (e1 e2 &optional (tg *tg*))
+  (when (or (tp-not-before-p (get-beg tg e1) (get-end tg e1))
+            (tp-not-before-p (get-end tg e1) (get-beg tg e2))
+            (tp-not-before-p (get-beg tg e2) (get-end tg e2)))
+    (format t "~A precond ~A is inconsistent in timegraph ~A" e1 e2 tg)
+    (return-from tg-assert-precond  nil))
   (let* ((pair1 (tp-assert-before tg (get-beg tg e1) (get-end tg e1)))
          (pair2 (tp-assert-before tg (first pair1) (get-beg tg e2)))
          (pair3 (tp-assert-equal tg (second pair1) (get-end tg e2))))
@@ -113,6 +132,12 @@
     (set-end tg e2 (second pair3))))
 
 (defun tg-assert-during (e1 e2 &optional (tg *tg*))
+  (when (or (tp-not-before-p (get-beg tg e1) (get-end tg e1))
+            (tp-not-before-p (get-beg tg e2) (get-end tg e2))
+            (tp-not-before-p (get-beg tg e2) (get-beg tg e1))
+            (tp-not-before-p (get-end tg e1) (get-end tg e2)))
+    (format t "~A during ~A is inconsistent in timegraph ~A" e1 e2 tg)
+    (return-from tg-assert-during  nil))
   (let* ((pair1 (tp-assert-before tg (get-beg tg e1) (get-end tg e1)))
          (pair2 (tp-assert-before tg (get-beg tg e2) (get-end tg e2)))
          (pair3 (tp-assert-before tg (first pair2) (first pair1)))
@@ -157,6 +182,33 @@
         (t3 (get-beg tg e2))
         (t4 (get-end tg e2)))
     (and (tp-before-p t1 t2) (tp-before-p t3 t4) (tp-before-p t3 t1) (tp-before-p t2 t4))))
+
+; Quantitative Bounding Functions
+; -------------------------------------------------------------------------
+
+(defun update-lower-bound (e1 ts &optional (tg *tg*))
+  (let* ((tp (get-beg tg e1))
+         (upper-ts (tp-upper tp)))
+    ;; First check if the timebound is inconsistent. Since optimal bounds are
+    ;; always propagated, this amounts to just checking the upper bound on
+    ;; this point.
+    (when (and upper-ts (local-time:timestamp< upper-ts ts))
+      (format t "Error: inconsistent lower bound ~A on episode ~A" ts e1)
+      (return-from update-lower-bound))
+    ;; Now, we are free to add the bound and propagate.
+    (update-lower tp ts)))
+
+(defun update-upper-bound (e1 ts &optional (tg *tg*))
+  (let* ((tp (get-end tg e1))
+         (lower-ts (tp-lower tp)))
+    ;; First check if the timebound is inconsistent. Since optimal bounds are
+    ;; always propagated, this amounts to just checking the upper bound on
+    ;; this point.
+    (when (and lower-ts (local-time:timestamp> lower-ts ts))
+      (format t "Error: inconsistent upper bound ~A on episode ~A" ts e1)
+      (return-from update-upper-bound))
+    ;; Now, we are free to add the bound and propagate.
+    (update-upper tp ts)))
 
 ; Printing Functions
 ; -------------------------------------------------------------------------

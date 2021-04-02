@@ -17,7 +17,11 @@
    #:consec
    #:at-about
    #:precond-of
-   #:postcond-of))
+   #:postcond-of
+
+   ;; Quant bounds
+   #:update-upper-bound
+   #:update-lower-bound))
 
 (defpackage #:timegraph.implementation
   (:use :common-lisp :timegraph))
