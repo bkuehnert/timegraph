@@ -5,7 +5,7 @@
 A timegraph is a directed, acyclic graph whose vertices represent single points in time, and whose edges represent a ≤ relationship. Each episode corresponds to two points in the timegraph: One representing the beginning of the episode, and one representing the end of the episode (and the first coming before the second).
 
 ## Installation
-The `:timegraph` system has no dependencies. The easiest way to install it is with quicklisp. Clone the repository to `~/quicklisp/local-projects/`, and then run `(ql:quickload :timegraph)` in the REPL.
+The only dependency of `:timegraph` is [local-time](https://github.com/dlowe-net/local-time). The easiest way to install it is with quicklisp. Clone this repository to `~/quicklisp/local-projects/`, and then run `(ql:quickload :timegraph)` in the REPL.
 
 To run the tests, first install `clunit2` (available on quicklisp), and then run `(asdf:test-system :timegraph)`. 
 
@@ -31,5 +31,17 @@ Asserts the proposition `prop` in the timegraph `tg`.
 Evaluates the proposition `prop` in the the timegraph `tg`. This returns `T` if the inference can be made, and `NIL` if the inference cannot be made. 
 **Note**: Since the timegraph can only store ≤ relations, then we cannot assert any < relation. Thus, propositions cannot be proven false.
 
-#### References
+### Quantitative bounds
+Timegraph also supports quantitative bounds with `:local-time` timestamps. The two functions which do this are:
+```lisp
+(update-lower-bound e1 ts tg)
+```
+asserts that the timestamp `ts` is a lower bound of the episode `e1` in timegraph `tg`. Similarly,
+```lisp
+(update-upper-bound e1 ts tg)
+```
+asserts that the timestamp `ts` is an upper bound of the episode `e1` in timegraph `tg`.
+
+
+## References
 <a id="1">[1]</a>: Taugher J. 1983. An efficient representation for time information. M.<span></span>Sc. thesis, Department of Computing Science, University of Alberta, Edmonton, AB.
